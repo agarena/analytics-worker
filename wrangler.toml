@@ -1,0 +1,18 @@
+name = "demo-analytics"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+# 允许跨域的站点来源（逗号分隔白名单，避免被任意站点盗用接口）
+# 只放行你自己的两个托管源；其他网站的跨域请求会被浏览器拒绝。
+# 若需新增来源（如绑定自有域名），在此追加即可。
+[vars]
+ALLOW_ORIGIN = "https://agarena.github.io,https://e86da65200354d31a446550366fc818e.app.workbuddy.link"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "analytics-db"
+# 执行 `wrangler d1 create analytics-db` 后，把返回的 uuid 填到这里
+database_id = "e24e9594-63cd-48ad-acff-f205515b2537"
+
+# 后台密码（不要写在这里，用 secret 设置）：
+#   wrangler secret put ADMIN_TOKEN
