@@ -226,6 +226,175 @@ new Chart(document.getElementById('geo'),{type:'bar',data:{labels:byCountry.map(
 </div></body></html>`;
 }
 
+// ---------- 内容接口：新主页从 D1 拉取展示内容（改库即改站，无需重新部署） ----------
+function jparse(s, d) {
+  try { return JSON.parse(s); } catch (e) { return d; }
+}
+
+function jsonRes(obj, cache) {
+  const h = { "Content-Type": "application/json; charset=utf-8" };
+  if (cache) h["Cache-Control"] = "public, max-age=" + cache;
+  return new Response(JSON.stringify(obj), { headers: h });
+}
+
+async function handleTools(env) {
+  const r = await env.DB.prepare(
+    `SELECT slug, name, category, one_liner, links_json, media_json, qa_json
+     FROM tools ORDER BY sort, id`
+  ).all();
+  const tools = (r.results || []).map((x) => ({
+    slug: x.slug,
+    name: x.name,
+    category: x.category,
+    one_liner: x.one_liner,
+    links: jparse(x.links_json, []),
+    media: jparse(x.media_json, []),
+    qa: jparse(x.qa_json, []),
+  }));
+  return jsonRes(tools, 60);
+}
+
+async function handleFeed(env) {
+  const r = await env.DB.prepare(`SELECT type, text FROM feed ORDER BY sort, id DESC`).all();
+  return jsonRes(r.results || [], 60);
+}
+
+async function handleSite(env) {
+  const r = await env.DB.prepare(`SELECT key, value FROM site`).all();
+  const o = {};
+  for (const x of r.results || []) o[x.key] = x.value;
+  return jsonRes(o, 60);
+}
+
+// 新主页批量上报：page_view → visits（带边缘地理信息）；dwell → 回写停留时长；
+// 其余事件（tool_view / outbound_click / demo_open / scroll_depth ...）→ events 表
+async function handleCollect(request, env) {
+  const ip = clientIp(request);
+  const now = Date.now();
+  const bucket = Math.floor(now / 60000);
+  const rk = ip + ":" + bucket;
+  RATE.set(rk, (RATE.get(rk) || 0) + 1);
+  if (RATE.get(rk) > 30) return Response.json({ ok: false, msg: "rate limited" }, { status: 429 });
+
+  const body = await request.json().catch(() => ({}));
+  const ctx = body.context || {};
+  const events = Array.isArray(body.events) ? body.events.slice(0, 40) : [];
+  const cf = request.cf || {};
+  const ua = request.headers.get("User-Agent") || "";
+
+  for (const ev of events) {
+    const type = (ev.type || "event").toString().slice(0, 60);
+    const path = (ev.path || ctx.path || "/").toString().slice(0, 300);
+    const ts = Number(ev.ts) || now;
+    const day = new Date(ts).toISOString().slice(0, 10);
+
+    if (type === "page_view") {
+      await env.DB.prepare(
+        `INSERT INTO visits (ip, ua, referer, path, day, ts, dwell_ms, country, continent, asn, isp, tz)
+         VALUES (?,?,?,?,?,?,0,?,?,?,?,?)`
+      )
+        .bind(
+          ip, ua, ctx.referrer || request.headers.get("Referer") || "", path,
+          day, ts,
+          cf.country || "??", cf.continent || "", cf.asn || null,
+          cf.asOrganization || "", cf.timezone || ""
+        )
+        .run();
+    } else if (type === "dwell") {
+      const dwell = Math.max(0, Number(ev.meta && ev.meta.dwell) || 0);
+      if (dwell > 0) {
+        await env.DB.prepare(
+          `UPDATE visits SET dwell_ms = ? WHERE id = (SELECT id FROM visits WHERE ip = ? ORDER BY ts DESC LIMIT 1)`
+        ).bind(dwell, ip).run();
+      }
+    } else {
+      const detail = JSON.stringify({
+        t: ev.targetType != null ? ev.targetType : null,
+        id: ev.targetId != null ? ev.targetId : null,
+        url: ev.url != null ? ev.url : null,
+        meta: ev.meta != null ? ev.meta : null,
+      }).slice(0, 200);
+      await env.DB.prepare(
+        `INSERT INTO events (ip, type, detail, path, day, ts) VALUES (?,?,?,?,?,?)`
+      ).bind(ip, type, detail, path, day, ts).run();
+    }
+  }
+  return Response.json({ ok: true, accepted: events.length });
+}
+
+// ---------- 管理写接口：改内容不用重新部署。密码与 /admin 相同 ----------
+function isAdmin(request, env) {
+  const t =
+    request.headers.get("X-Admin-Key") ||
+    new URL(request.url).searchParams.get("key") || "";
+  return Boolean(env.ADMIN_TOKEN) && t === env.ADMIN_TOKEN;
+}
+
+function unauthorized() {
+  return new Response("401 Unauthorized", { status: 401 });
+}
+
+// 新增/更新一个工具（slug 定位；JSON 字段传对象数组，不必自己拼字符串）
+async function handleToolUpsert(request, env) {
+  const b = await request.json().catch(() => null);
+  if (!b || !b.name) return Response.json({ ok: false, msg: "name required" }, { status: 400 });
+  const slug = (b.slug || b.name).toString().trim().toLowerCase().replace(/\s+/g, "-").slice(0, 60);
+  await env.DB.prepare(
+    `INSERT INTO tools (slug, name, category, one_liner, sort, links_json, media_json, qa_json, updated_ts)
+     VALUES (?,?,?,?,?,?,?,?,?)
+     ON CONFLICT(slug) DO UPDATE SET
+       name=excluded.name, category=excluded.category, one_liner=excluded.one_liner,
+       sort=excluded.sort, links_json=excluded.links_json, media_json=excluded.media_json,
+       qa_json=excluded.qa_json, updated_ts=excluded.updated_ts`
+  )
+    .bind(
+      slug,
+      b.name.toString().slice(0, 80),
+      (b.category || "").toString().slice(0, 40),
+      (b.one_liner || "").toString().slice(0, 500),
+      Number(b.sort) || 0,
+      JSON.stringify(b.links || []),
+      JSON.stringify(b.media || []),
+      JSON.stringify(b.qa || []),
+      Date.now()
+    )
+    .run();
+  return Response.json({ ok: true, slug });
+}
+
+// 跑马灯：POST {type:'update'|'news'|'soon', text} 加一条；DELETE ?id= 删一条
+async function handleFeedPost(request, env) {
+  const b = await request.json().catch(() => ({}));
+  const text = (b.text || "").toString().slice(0, 120).trim();
+  if (!text) return Response.json({ ok: false, msg: "text required" }, { status: 400 });
+  const type = ["update", "news", "soon"].includes(b.type) ? b.type : "update";
+  await env.DB.prepare(`INSERT INTO feed (type, text, created_ts) VALUES (?,?,?)`)
+    .bind(type, text, Date.now())
+    .run();
+  return Response.json({ ok: true });
+}
+
+async function handleFeedDelete(request, env) {
+  const id = Number(new URL(request.url).searchParams.get("id"));
+  if (!id) return Response.json({ ok: false, msg: "id required" }, { status: 400 });
+  await env.DB.prepare(`DELETE FROM feed WHERE id = ?`).bind(id).run();
+  return Response.json({ ok: true });
+}
+
+// 站点信息：POST {brand_name, contact_email} 任意子集
+async function handleSiteSet(request, env) {
+  const b = await request.json().catch(() => ({}));
+  for (const k of ["brand_name", "contact_email"]) {
+    if (b[k] === undefined || b[k] === null || b[k] === "") continue;
+    await env.DB.prepare(
+      `INSERT INTO site (key, value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`
+    )
+      .bind(k, b[k].toString().slice(0, 120))
+      .run();
+  }
+  return Response.json({ ok: true });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -237,6 +406,18 @@ export default {
       if (p === "/api/dwell" && request.method === "POST") return withCors(await handleDwell(request, env), cors);
       if (p === "/api/feedback" && request.method === "POST") return withCors(await handleFeedback(request, env), cors);
       if (p === "/api/event" && request.method === "POST") return withCors(await handleEvent(request, env), cors);
+      if (p === "/api/tools" && request.method === "GET") return withCors(await handleTools(env), cors);
+      if (p === "/api/feed" && request.method === "GET") return withCors(await handleFeed(env), cors);
+      if (p === "/api/site" && request.method === "GET") return withCors(await handleSite(env), cors);
+      if (p === "/api/collect" && request.method === "POST") return withCors(await handleCollect(request, env), cors);
+      if (p === "/api/admin/tool" && request.method === "POST")
+        return isAdmin(request, env) ? withCors(await handleToolUpsert(request, env), cors) : unauthorized();
+      if (p === "/api/admin/feed" && request.method === "POST")
+        return isAdmin(request, env) ? withCors(await handleFeedPost(request, env), cors) : unauthorized();
+      if (p === "/api/admin/feed" && request.method === "DELETE")
+        return isAdmin(request, env) ? withCors(await handleFeedDelete(request, env), cors) : unauthorized();
+      if (p === "/api/admin/site" && request.method === "POST")
+        return isAdmin(request, env) ? withCors(await handleSiteSet(request, env), cors) : unauthorized();
       if (p === "/admin") return await handleAdmin(request, env);
       return new Response("not found", { status: 404 });
     } catch (e) {

@@ -49,3 +49,32 @@ CREATE TABLE IF NOT EXISTS events (
   ts      INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_events_ts ON events(ts);
+
+-- ===== 内容表：新主页 /api/tools /api/feed /api/site 的数据源 =====
+-- 修改内容走 /api/admin/* 接口或 wrangler d1 execute，访客下次打开即生效。
+
+CREATE TABLE IF NOT EXISTS tools (
+  id        INTEGER PRIMARY KEY AUTOINCREMENT,
+  slug      TEXT UNIQUE NOT NULL,   -- 稳定标识，管理接口按它定位
+  name      TEXT NOT NULL,
+  category  TEXT DEFAULT '',        -- 角标/分类，如 Voice
+  one_liner TEXT DEFAULT '',        -- 一句话描述
+  sort      INTEGER DEFAULT 0,      -- 展示顺序，小者在前
+  links_json  TEXT DEFAULT '[]',    -- [{kind:'open'|'demo', url:'...'}]
+  media_json  TEXT DEFAULT '[]',    -- [{type:'image'|'video', url, caption, poster}]
+  qa_json     TEXT DEFAULT '[]',    -- [{question, answer}]
+  updated_ts  INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS feed (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  type       TEXT DEFAULT 'update', -- update | news | soon
+  text       TEXT NOT NULL,
+  sort       INTEGER DEFAULT 0,
+  created_ts INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS site (
+  key   TEXT PRIMARY KEY,           -- brand_name / contact_email
+  value TEXT
+);
