@@ -2,11 +2,16 @@ name = "demo-analytics"
 main = "src/index.js"
 compatibility_date = "2025-01-01"
 
+# 自定义域名（大陆可达；workers.dev 被墙后此为主入口）
+routes = [
+  { pattern = "api.agarena.xyz", custom_domain = true }
+]
+
 # 允许跨域的站点来源（逗号分隔白名单，避免被任意站点盗用接口）
-# 只放行你自己的两个托管源；其他网站的跨域请求会被浏览器拒绝。
-# 若需新增来源（如绑定自有域名），在此追加即可。
+# 只放行你自己的托管源；其他网站的跨域请求会被浏览器拒绝。
+# 若需新增来源，在此追加即可。
 [vars]
-ALLOW_ORIGIN = "https://agarena.github.io,https://e86da65200354d31a446550366fc818e.app.workbuddy.link"
+ALLOW_ORIGIN = "https://agarena.github.io,https://agarena.xyz,https://www.agarena.xyz,https://e86da65200354d31a446550366fc818e.app.workbuddy.link"
 
 [[d1_databases]]
 binding = "DB"
