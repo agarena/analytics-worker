@@ -1,10 +1,14 @@
 -- D1 (SQLite at edge) schema for visitor analytics + feedback
 -- 部署时执行：wrangler d1 execute analytics-db --file=./schema.sql
 --
--- 采集层（Worker /api/visit）只写入原始字段：
+-- 采集层（Worker /api/collect）只写入原始字段：
 --   ip / ua / referer / path / day / ts / dwell_ms
+--   + anon_id / session_id（前端匿名卡号与会话号）
+--   + src / src_v / landing（来源暗号 ?from=平台&v=内容编号 与完整落地网址）
 -- 地理解析结果列（country/continent/region/city/asn/isp/lat/lon/tz）初始为空，
 -- 由后续离线程序基于 ip 解析后 UPDATE 回填，不在访客请求路径上做解析。
+-- 注意：已有线上库升级到新列需手动 ALTER（见 alter-2026-09-08.sql），
+-- 本文件的 CREATE TABLE IF NOT EXISTS 只对全新空库生效。
 
 CREATE TABLE IF NOT EXISTS visits (
   id        INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -23,11 +27,17 @@ CREATE TABLE IF NOT EXISTS visits (
   isp       TEXT,
   lat       REAL,
   lon       REAL,
-  tz        TEXT
+  tz        TEXT,
+  anon_id   TEXT,            -- 访客匿名卡号（localStorage 持久），识别回头客
+  session_id TEXT,           -- 会话号（每次打开页面一个），串联一次访问的全部行为
+  src       TEXT,            -- 来源平台暗号，如 bilibili / gzh / xhs / douyin
+  src_v     TEXT,            -- 来源内容编号，如 lv01（哪条视频/笔记带来的）
+  landing   TEXT             -- 落地完整网址（含查询参数），原始留档防丢信息
 );
 CREATE INDEX IF NOT EXISTS idx_visits_ts   ON visits(ts);
 CREATE INDEX IF NOT EXISTS idx_visits_day  ON visits(day);
 CREATE INDEX IF NOT EXISTS idx_visits_ip   ON visits(ip);
+CREATE INDEX IF NOT EXISTS idx_visits_sid  ON visits(session_id);
 
 CREATE TABLE IF NOT EXISTS feedback (
   id      INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -46,7 +56,8 @@ CREATE TABLE IF NOT EXISTS events (
   detail  TEXT,        -- 事件细节，如按钮标识 'cta_like'
   path    TEXT,
   day     TEXT,        -- YYYY-MM-DD，便于按天聚合
-  ts      INTEGER
+  ts      INTEGER,
+  session_id TEXT     -- 会话号，可与 visits 按 session 关联出来源/访客
 );
 CREATE INDEX IF NOT EXISTS idx_events_ts ON events(ts);
 

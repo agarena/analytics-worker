@@ -141,6 +141,9 @@ async function handleAdmin(request, env) {
   const avgDwell = await env.DB.prepare(
     `SELECT AVG(dwell_ms) a FROM visits WHERE ts > ? AND dwell_ms > 0`
   ).bind(since).first();
+  const bySrc = await env.DB.prepare(
+    `SELECT src, src_v, COUNT(*) c FROM visits WHERE ts > ? AND src IS NOT NULL AND src != '' GROUP BY src, src_v ORDER BY c DESC LIMIT 20`
+  ).bind(since).all();
   const fb = await env.DB.prepare(`SELECT name, message, ts FROM feedback ORDER BY ts DESC LIMIT 50`).all();
   const btnClicks = await env.DB.prepare(`SELECT COUNT(*) c FROM events WHERE type='btn_click' AND ts > ?`).bind(since).first();
   const events = await env.DB.prepare(`SELECT type, detail, ip, ts FROM events ORDER BY ts DESC LIMIT 30`).all();
@@ -152,6 +155,7 @@ async function handleAdmin(request, env) {
     byCountry: byCountry.results,
     byDay: byDay.results,
     byPath: byPath.results,
+    bySrc: bySrc.results,
     feedback: fb.results,
     events: events.results,
   };
@@ -169,6 +173,11 @@ function renderAdmin(d, days) {
   const pathRows = d.byPath
     .map((r) => `<tr><td>${esc(r.path)}</td><td>${r.c}</td></tr>`)
     .join("");
+  const srcRows = d.bySrc.length
+    ? d.bySrc
+        .map((r) => `<tr><td>${esc(r.src)}</td><td>${esc(r.src_v || "")}</td><td>${r.c}</td></tr>`)
+        .join("")
+    : '<tr><td colspan="3">暂无来源数据（站外链接需带 ?from= 参数）</td></tr>';
   const fbRows = d.feedback.length
     ? d.feedback
         .map(
@@ -214,6 +223,7 @@ ul{font-size:13px;line-height:1.7;padding-left:18px;}
 </div>
 <div class="grid">
 <div class="box"><h3>访问路径</h3><table><tr><th>路径</th><th>次数</th></tr>${pathRows}</table></div>
+<div class="box"><h3>来源渠道（平台 · 内容编号）</h3><table><tr><th>平台</th><th>内容</th><th>次数</th></tr>${srcRows}</table></div>
 <div class="box"><h3>留言反馈（不公开）</h3><ul>${fbRows}</ul></div>
 <div class="box" style="grid-column:1/-1;"><h3>交互事件 · 按钮点击等（不公开）</h3><ul>${evRows}</ul></div>
 </div>
@@ -281,6 +291,12 @@ async function handleCollect(request, env) {
   const events = Array.isArray(body.events) ? body.events.slice(0, 40) : [];
   const cf = request.cf || {};
   const ua = request.headers.get("User-Agent") || "";
+  // 访客匿名卡号 / 会话号 / 来源暗号（?from=平台&v=内容编号），随 page_view 落库
+  const anon = (body.anonId || "").toString().slice(0, 60) || null;
+  const sid = (body.sessionId || "").toString().slice(0, 60) || null;
+  const src = (ctx.src || "").toString().slice(0, 40) || null;
+  const srcV = (ctx.v || "").toString().slice(0, 40) || null;
+  const landing = (ctx.landing || "").toString().slice(0, 500) || null;
 
   for (const ev of events) {
     const type = (ev.type || "event").toString().slice(0, 60);
@@ -290,22 +306,30 @@ async function handleCollect(request, env) {
 
     if (type === "page_view") {
       await env.DB.prepare(
-        `INSERT INTO visits (ip, ua, referer, path, day, ts, dwell_ms, country, continent, asn, isp, tz)
-         VALUES (?,?,?,?,?,?,0,?,?,?,?,?)`
+        `INSERT INTO visits (ip, ua, referer, path, day, ts, dwell_ms, country, continent, asn, isp, tz, anon_id, session_id, src, src_v, landing)
+         VALUES (?,?,?,?,?,?,0,?,?,?,?,?,?,?,?,?,?)`
       )
         .bind(
           ip, ua, ctx.referrer || request.headers.get("Referer") || "", path,
           day, ts,
           cf.country || "??", cf.continent || "", cf.asn || null,
-          cf.asOrganization || "", cf.timezone || ""
+          cf.asOrganization || "", cf.timezone || "",
+          anon, sid, src, srcV, landing
         )
         .run();
     } else if (type === "dwell") {
       const dwell = Math.max(0, Number(ev.meta && ev.meta.dwell) || 0);
       if (dwell > 0) {
-        await env.DB.prepare(
-          `UPDATE visits SET dwell_ms = ? WHERE id = (SELECT id FROM visits WHERE ip = ? ORDER BY ts DESC LIMIT 1)`
-        ).bind(dwell, ip).run();
+        // 优先按会话号回写（同一会话只有一次 page_view）；老访客无会话号时退回按 IP
+        if (sid) {
+          await env.DB.prepare(
+            `UPDATE visits SET dwell_ms = ? WHERE id = (SELECT id FROM visits WHERE session_id = ? ORDER BY ts DESC LIMIT 1)`
+          ).bind(dwell, sid).run();
+        } else {
+          await env.DB.prepare(
+            `UPDATE visits SET dwell_ms = ? WHERE id = (SELECT id FROM visits WHERE ip = ? ORDER BY ts DESC LIMIT 1)`
+          ).bind(dwell, ip).run();
+        }
       }
     } else {
       const detail = JSON.stringify({
@@ -315,8 +339,8 @@ async function handleCollect(request, env) {
         meta: ev.meta != null ? ev.meta : null,
       }).slice(0, 200);
       await env.DB.prepare(
-        `INSERT INTO events (ip, type, detail, path, day, ts) VALUES (?,?,?,?,?,?)`
-      ).bind(ip, type, detail, path, day, ts).run();
+        `INSERT INTO events (ip, type, detail, path, day, ts, session_id) VALUES (?,?,?,?,?,?,?)`
+      ).bind(ip, type, detail, path, day, ts, sid).run();
     }
   }
   return Response.json({ ok: true, accepted: events.length });
