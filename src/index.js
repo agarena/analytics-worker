@@ -162,6 +162,15 @@ async function handleAdmin(request, env) {
   const pfLogTypes = await env.DB.prepare(
     `SELECT type, COUNT(*) c FROM pf_logs WHERE ts > ? GROUP BY type ORDER BY c DESC`
   ).bind(since).all();
+  // 表情包站：待审投稿 / 预览 / 最新评论
+  const stPendingN = await env.DB.prepare(`SELECT COUNT(*) c FROM stickers WHERE status='pending'`).first();
+  const stPending = await env.DB.prepare(
+    `SELECT id, title, characters_json, tags_json, author, platform, img, created_ts
+     FROM stickers WHERE status='pending' ORDER BY created_ts DESC`
+  ).all();
+  const stCmts = await env.DB.prepare(
+    `SELECT id, sticker_id, nick, text, ts FROM sticker_comments ORDER BY ts DESC LIMIT 50`
+  ).all();
   const pfLogRecent = await env.DB.prepare(
     `SELECT type, prompt_id, detail, ip, ts FROM pf_logs ORDER BY ts DESC LIMIT 100`
   ).all();
@@ -184,6 +193,11 @@ async function handleAdmin(request, env) {
       pfb: pfb.results,
       logTypes: pfLogTypes.results,
       logRecent: pfLogRecent.results,
+    },
+    st: {
+      pendingN: stPendingN?.c || 0,
+      pending: stPending.results,
+      cmts: stCmts.results,
     },
   };
 
@@ -257,6 +271,29 @@ function renderAdmin(d, days, key) {
         )
         .join("")
     : "<li>暂无日志</li>";
+  // 表情包站区块
+  const stPendingRows = d.st.pending.length
+    ? d.st.pending
+        .map(
+          (r) =>
+            `<div class="sub"><b>${esc(r.title)}</b> · ${esc(r.author || "匿名")}${r.platform ? " · " + esc(r.platform) : ""} · ${new Date(r.created_ts).toLocaleString()}<br>` +
+            `<span class="dim">角色：${esc((r.characters_json || "[]").replace(/["\[\]]/g, ""))} ｜ 标签：${esc((r.tags_json || "[]").replace(/["\[\]]/g, ""))}</span><br>` +
+            (r.img && r.img.startsWith("data:") ? `<img src="${esc(r.img)}" alt="投稿图">` : "") +
+            `<br><button data-st-action="publish" data-id="${esc(r.id)}">通过上架</button>` +
+            `<button data-st-action="hide" data-id="${esc(r.id)}" class="warn">隐藏</button>` +
+            `<button data-st-action="delete" data-id="${esc(r.id)}" class="warn">删除</button></div>`
+        )
+        .join("")
+    : "<div class='dim'>暂无待审投稿</div>";
+  const stCmtRows = d.st.cmts.length
+    ? d.st.cmts
+        .map(
+          (r) =>
+            `<li><b>${esc(r.nick)}</b> → ${esc(r.sticker_id)} · <code>${esc(r.ip || "")}</code> · ${new Date(r.ts).toLocaleString()}<br>${esc(r.text)} ` +
+            `<button data-st-cmt="${r.id}" class="warn" style="padding:2px 10px;font-size:12px;">删除</button></li>`
+        )
+        .join("")
+    : "<li>暂无评论</li>";
 
   return `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -288,6 +325,7 @@ ul{font-size:13px;line-height:1.7;padding-left:18px;}
 <div class="card"><div class="n">${d.pf.pendingN}</div><div class="l">提示词待审投稿</div></div>
 <div class="card"><div class="n">${d.pf.copies}</div><div class="l">提示词复制次数</div></div>
 <div class="card"><div class="n">${d.pf.totalLikes}</div><div class="l">提示词总点赞</div></div>
+<div class="card"><div class="n">${d.st.pendingN}</div><div class="l">表情包待审投稿</div></div>
 </div>
 <div class="grid">
 <div class="box"><h3>每日访问趋势</h3><canvas id="trend"></canvas></div>
@@ -302,10 +340,39 @@ ul{font-size:13px;line-height:1.7;padding-left:18px;}
 <div class="box"><h3>提示词反馈（不公开）</h3><ul>${pfbRows}</ul></div>
 <div class="box"><h3>提示词日志 · 按类型（近 ${days} 天）</h3><table><tr><th>类型</th><th>次数</th></tr>${logTypeRows}</table></div>
 <div class="box" style="grid-column:1/-1;"><h3>提示词日志 · 最近 100 条（不公开）</h3><ul>${logRows}</ul></div>
+<div class="box" style="grid-column:1/-1;"><h3>表情包投稿审核（待审 ${d.st.pendingN} 条 · 通过后上架 stickers.agarena.xyz）</h3>${stPendingRows}</div>
+<div class="box" style="grid-column:1/-1;"><h3>表情包评论管理（最近 50 条 · 留言即显）</h3><ul>${stCmtRows}</ul></div>
 </div>
 <script>
 const KEY = ${JSON.stringify(key).replace(/</g, "\\u003c")};
 document.addEventListener("click", async (e) => {
+  const sc = e.target.closest("[data-st-cmt]");
+  if (sc) {
+    if (!confirm("删除这条评论？")) return;
+    sc.disabled = true;
+    try {
+      const r = await fetch("/api/admin/sticker-comment?key=" + encodeURIComponent(KEY) + "&id=" + sc.dataset.stCmt, { method: "DELETE" });
+      const j = await r.json().catch(() => ({}));
+      if (j.ok) sc.closest("li").remove(); else { alert("删除失败"); sc.disabled = false; }
+    } catch (err) { alert("请求失败：" + err.message); sc.disabled = false; }
+    return;
+  }
+  const sb = e.target.closest("[data-st-action]");
+  if (sb) {
+    const act = sb.dataset.stAction === "publish" ? "通过上架" : sb.dataset.stAction === "hide" ? "隐藏" : "删除";
+    if (!confirm(act + "这个表情包投稿？")) return;
+    sb.disabled = true;
+    try {
+      const r = await fetch("/api/admin/sticker?key=" + encodeURIComponent(KEY), {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: sb.dataset.id, action: sb.dataset.stAction }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (j.ok) location.reload();
+      else { alert("操作失败：" + (j.msg || r.status)); sb.disabled = false; }
+    } catch (err) { alert("请求失败：" + err.message); sb.disabled = false; }
+    return;
+  }
   const b = e.target.closest("[data-pf-action]");
   if (!b) return;
   if (!confirm((b.dataset.pfAction === "publish" ? "通过上架" : b.dataset.pfAction === "hide" ? "隐藏" : "删除") + "这条投稿？")) return;
@@ -518,11 +585,13 @@ async function handleSiteSet(request, env) {
 // 传 ctx 时走 waitUntil 不阻塞响应；不传则由调用方自行 await 返回的 Promise。
 function pfLog(env, ctx, entry) {
   const ts = Number(entry.ts) || Date.now();
+  const site = entry.site === "stickers" ? "stickers" : "prompts";
   const p = env.DB.prepare(
-    `INSERT INTO pf_logs (type, prompt_id, detail, ip, visitor_id, session_id, day, ts) VALUES (?,?,?,?,?,?,?,?)`
+    `INSERT INTO pf_logs (type, site, prompt_id, detail, ip, visitor_id, session_id, day, ts) VALUES (?,?,?,?,?,?,?,?,?)`
   )
     .bind(
       (entry.type || "event").toString().slice(0, 60),
+      site,
       (entry.prompt_id || "").toString().slice(0, 60),
       entry.detail != null ? JSON.stringify(entry.detail).slice(0, 500) : "",
       entry.ip || "",
@@ -561,12 +630,12 @@ async function handlePromptsList(env) {
   return jsonRes(list, 60);
 }
 
-// 限流：key 可加后缀隔离配额（如 ':sub' 给投稿/反馈更严的额度）
-function rateLimit(request, extra) {
+// 限流：key 可加后缀隔离配额，limit 为该桶每分钟上限
+function rateLimit(request, extra, limit) {
   const ip = clientIp(request);
   const rk = ip + ":" + Math.floor(Date.now() / 60000) + (extra || "");
   RATE.set(rk, (RATE.get(rk) || 0) + 1);
-  return RATE.get(rk) <= 30;
+  return RATE.get(rk) <= (limit || 30);
 }
 
 // 点赞/取消：prompt_likes 去重表 + prompts.likes 计数，batch 保证一致
@@ -606,7 +675,7 @@ async function handlePromptLike(request, env, ctx) {
 
 // 投稿：先审后显，入库 status='pending'，展示编号待审核通过时分配
 async function handlePromptSubmit(request, env, ctx) {
-  if (!rateLimit(request, ":sub")) return Response.json({ ok: false, msg: "rate limited" }, { status: 429 });
+  if (!rateLimit(request, ":sub", 3)) return Response.json({ ok: false, msg: "rate limited" }, { status: 429 });
   const body = await request.json().catch(() => ({}));
   if (body.hp) return Response.json({ ok: true }); // 蜜罐：人类不会填
   const title = (body.title || "").toString().trim().slice(0, 80);
@@ -640,7 +709,7 @@ async function handlePromptSubmit(request, env, ctx) {
 
 // 提示词站反馈（评价/建议/问题，可关联卡片），仅后台可见
 async function handlePromptFeedback(request, env, ctx) {
-  if (!rateLimit(request, ":sub")) return Response.json({ ok: false, msg: "rate limited" }, { status: 429 });
+  if (!rateLimit(request, ":sub", 5)) return Response.json({ ok: false, msg: "rate limited" }, { status: 429 });
   const body = await request.json().catch(() => ({}));
   if (body.hp) return Response.json({ ok: true });
   const text = (body.text || "").toString().trim().slice(0, 2000);
@@ -656,7 +725,7 @@ async function handlePromptFeedback(request, env, ctx) {
   return Response.json({ ok: true });
 }
 
-// 前端行为日志批量接收（sendBeacon / fetch keepalive）
+// 前端行为日志批量接收（fetch keepalive）。body.site 区分来源站：prompts（默认）| stickers
 async function handlePromptLog(request, env) {
   if (!rateLimit(request)) return Response.json({ ok: false, msg: "rate limited" }, { status: 429 });
   const body = await request.json().catch(() => ({}));
@@ -666,6 +735,7 @@ async function handlePromptLog(request, env) {
     events.map((ev) =>
       pfLog(env, null, {
         type: ev.type,
+        site: body.site,
         prompt_id: ev.promptId,
         detail: ev.meta != null ? ev.meta : null,
         ip,
@@ -722,6 +792,171 @@ async function handlePromptAdmin(request, env, ctx) {
   return Response.json({ ok: true });
 }
 
+// ---------- AI 表情包站（stickers.agarena.xyz）----------
+
+// 已发布列表：img 列对官方是 assets/ 相对路径、对投稿是 dataURL，前端都当图片 src 用
+async function handleStickersList(env) {
+  const r = await env.DB.prepare(
+    `SELECT id, title, characters_json, tags_json, author, platform, source_url, img, likes, created_ts, updated_ts
+     FROM stickers WHERE status = 'published' ORDER BY updated_ts DESC`
+  ).all();
+  const list = (r.results || []).map((x) => ({
+    id: x.id,
+    file: x.img || "",
+    title: x.title,
+    characters: jparse(x.characters_json, []),
+    tags: jparse(x.tags_json, []),
+    author: x.author || "",
+    platform: x.platform || "",
+    sourceUrl: x.source_url || "",
+    likes: x.likes || 0,
+    added: x.created_ts ? new Date(x.created_ts).toISOString().slice(0, 10) : "",
+    ts: x.updated_ts || x.created_ts || 0,
+  }));
+  return jsonRes(list, 60);
+}
+
+// 评论区一次全量拉取（每张 ≤ 数条，总量小）
+async function handleStickerComments(env) {
+  const r = await env.DB.prepare(
+    `SELECT id, sticker_id, nick, text, ts FROM sticker_comments ORDER BY ts ASC LIMIT 500`
+  ).all();
+  const out = {};
+  for (const c of r.results || []) {
+    (out[c.sticker_id] = out[c.sticker_id] || []).push({ id: c.id, nick: c.nick, text: c.text, ts: c.ts });
+  }
+  return jsonRes(out, 30);
+}
+
+async function handleStickerLike(request, env, ctx) {
+  if (!rateLimit(request)) return Response.json({ ok: false, msg: "rate limited" }, { status: 429 });
+  const body = await request.json().catch(() => ({}));
+  const id = (body.id || "").toString().slice(0, 60);
+  const vid = (body.vid || "").toString().slice(0, 60);
+  if (!id || !vid) return Response.json({ ok: false, msg: "id/vid required" }, { status: 400 });
+  const wantLike = body.liked !== false;
+
+  const cur = await env.DB.prepare(`SELECT 1 AS x FROM sticker_likes WHERE sticker_id = ? AND visitor_id = ?`)
+    .bind(id, vid)
+    .first();
+  const now = Date.now();
+  if (wantLike && !cur) {
+    await env.DB.batch([
+      env.DB.prepare(`INSERT INTO sticker_likes (sticker_id, visitor_id, ts) VALUES (?,?,?)`).bind(id, vid, now),
+      env.DB.prepare(`UPDATE stickers SET likes = likes + 1 WHERE id = ?`).bind(id),
+    ]);
+  } else if (!wantLike && cur) {
+    await env.DB.batch([
+      env.DB.prepare(`DELETE FROM sticker_likes WHERE sticker_id = ? AND visitor_id = ?`).bind(id, vid),
+      env.DB.prepare(`UPDATE stickers SET likes = MAX(likes - 1, 0) WHERE id = ?`).bind(id),
+    ]);
+  }
+  const row = await env.DB.prepare(`SELECT likes FROM stickers WHERE id = ?`).bind(id).first();
+  pfLog(env, ctx, {
+    type: wantLike ? "like" : "unlike",
+    site: "stickers",
+    prompt_id: id,
+    ip: clientIp(request),
+    visitor_id: vid,
+    ts: now,
+  });
+  return Response.json({ ok: true, liked: wantLike, likes: row ? row.likes : null });
+}
+
+// 投稿：先审后显。图片为前端压缩 dataURL（≤200KB）；角色/标签为字符串数组
+async function handleStickerSubmit(request, env, ctx) {
+  if (!rateLimit(request, ":sub", 3)) return Response.json({ ok: false, msg: "rate limited" }, { status: 429 });
+  const body = await request.json().catch(() => ({}));
+  if (body.hp) return Response.json({ ok: true });
+  let img = (body.img || "").toString();
+  if (img && !(/^data:image\/(png|jpe?g|webp);base64,/.test(img) && img.length <= 200 * 1024)) img = "";
+  if (!img) return Response.json({ ok: false, msg: "img required (dataURL ≤200KB)" }, { status: 400 });
+  const title = (body.title || "").toString().trim().slice(0, 80) || "未命名表情";
+  const chars = (Array.isArray(body.characters) ? body.characters : [])
+    .map((c) => c.toString().trim().toLowerCase().slice(0, 24)).filter(Boolean).slice(0, 5);
+  const tags = (Array.isArray(body.tags) ? body.tags : [])
+    .map((t) => t.toString().trim().replace(/^#+/, "").slice(0, 16)).filter(Boolean).slice(0, 6);
+  const author = (body.author || "").toString().slice(0, 40);
+  const platform = (body.platform || "").toString().slice(0, 20);
+  let srcUrl = (body.sourceUrl || "").toString().trim().slice(0, 300);
+  if (srcUrl && !/^https?:\/\/.+\..+/i.test(srcUrl)) srcUrl = "";
+
+  const now = Date.now();
+  const id = "u" + now;
+  await env.DB.prepare(
+    `INSERT INTO stickers (id, title, characters_json, tags_json, author, platform, source_url, img, likes, status, source, created_ts, updated_ts)
+     VALUES (?,?,?,?,?,?,?,?,0,'pending','user',?,?)`
+  )
+    .bind(id, title, JSON.stringify(chars), JSON.stringify(tags), author, platform, srcUrl, img, now, now)
+    .run();
+  pfLog(env, ctx, { type: "submit", site: "stickers", prompt_id: id, ip: clientIp(request), visitor_id: body.vid, detail: { title, chars } });
+  return Response.json({ ok: true, id });
+}
+
+// 评论：留言即显（蜜罐 + 限流），后台可删
+async function handleStickerComment(request, env, ctx) {
+  if (!rateLimit(request, ":sub", 5)) return Response.json({ ok: false, msg: "rate limited" }, { status: 429 });
+  const body = await request.json().catch(() => ({}));
+  if (body.hp) return Response.json({ ok: true });
+  const sid = (body.stickerId || "").toString().slice(0, 60);
+  const text = (body.text || "").toString().trim().slice(0, 500);
+  if (!sid || !text) return Response.json({ ok: false, msg: "stickerId/text required" }, { status: 400 });
+  const nick = (body.nick || "匿名").toString().slice(0, 20) || "匿名";
+  const ts = Date.now();
+  const r = await env.DB.prepare(
+    `INSERT INTO sticker_comments (sticker_id, nick, text, ip, visitor_id, ts) VALUES (?,?,?,?,?,?)`
+  )
+    .bind(sid, nick, text, clientIp(request), (body.vid || "").toString().slice(0, 60) || null, ts)
+    .run();
+  pfLog(env, ctx, { type: "comment", site: "stickers", prompt_id: sid, ip: clientIp(request), visitor_id: body.vid });
+  return Response.json({ ok: true, comment: { id: r.meta.last_row_id, nick, text, ts } });
+}
+
+// 管理：全状态列表
+async function handleAdminStickers(request, env) {
+  const status = new URL(request.url).searchParams.get("status");
+  const sql = `SELECT id, title, characters_json, tags_json, author, platform, source_url, img, likes, status, source, created_ts, updated_ts
+               FROM stickers ${status ? "WHERE status = ?" : ""} ORDER BY updated_ts DESC`;
+  const r = status ? await env.DB.prepare(sql).bind(status).all() : await env.DB.prepare(sql).all();
+  return Response.json({ ok: true, items: r.results || [] });
+}
+
+// 管理：publish / hide / delete（删除连带清点赞与评论）
+async function handleStickerAdmin(request, env, ctx) {
+  const b = await request.json().catch(() => null);
+  const id = b && (b.id || "").toString().slice(0, 60);
+  const action = b && b.action;
+  if (!id || !["publish", "hide", "delete"].includes(action))
+    return Response.json({ ok: false, msg: "id/action required" }, { status: 400 });
+
+  if (action === "publish") {
+    await env.DB.prepare(`UPDATE stickers SET status='published', updated_ts=? WHERE id=?`).bind(Date.now(), id).run();
+    pfLog(env, ctx, { type: "admin_publish", site: "stickers", prompt_id: id });
+    return Response.json({ ok: true });
+  }
+  if (action === "hide") {
+    await env.DB.prepare(`UPDATE stickers SET status='hidden', updated_ts=? WHERE id=?`).bind(Date.now(), id).run();
+    pfLog(env, ctx, { type: "admin_hide", site: "stickers", prompt_id: id });
+    return Response.json({ ok: true });
+  }
+  await env.DB.batch([
+    env.DB.prepare(`DELETE FROM sticker_likes WHERE sticker_id = ?`).bind(id),
+    env.DB.prepare(`DELETE FROM sticker_comments WHERE sticker_id = ?`).bind(id),
+    env.DB.prepare(`DELETE FROM stickers WHERE id = ?`).bind(id),
+  ]);
+  pfLog(env, ctx, { type: "admin_delete", site: "stickers", prompt_id: id });
+  return Response.json({ ok: true });
+}
+
+// 管理：删评论
+async function handleStickerCommentDelete(request, env, ctx) {
+  const id = Number(new URL(request.url).searchParams.get("id"));
+  if (!id) return Response.json({ ok: false, msg: "id required" }, { status: 400 });
+  await env.DB.prepare(`DELETE FROM sticker_comments WHERE id = ?`).bind(id).run();
+  pfLog(env, ctx, { type: "admin_delete_comment", site: "stickers", detail: { commentId: id } });
+  return Response.json({ ok: true });
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -743,6 +978,13 @@ export default {
       if (p === "/api/prompts/submit" && request.method === "POST") return withCors(await handlePromptSubmit(request, env, ctx), cors);
       if (p === "/api/prompts/feedback" && request.method === "POST") return withCors(await handlePromptFeedback(request, env, ctx), cors);
       if (p === "/api/prompts/log" && request.method === "POST") return withCors(await handlePromptLog(request, env), cors);
+      if (p === "/api/logs" && request.method === "POST") return withCors(await handlePromptLog(request, env), cors);
+      // AI 表情包站
+      if (p === "/api/stickers" && request.method === "GET") return withCors(await handleStickersList(env), cors);
+      if (p === "/api/stickers/comments" && request.method === "GET") return withCors(await handleStickerComments(env), cors);
+      if (p === "/api/stickers/like" && request.method === "POST") return withCors(await handleStickerLike(request, env, ctx), cors);
+      if (p === "/api/stickers/submit" && request.method === "POST") return withCors(await handleStickerSubmit(request, env, ctx), cors);
+      if (p === "/api/stickers/comment" && request.method === "POST") return withCors(await handleStickerComment(request, env, ctx), cors);
       if (p === "/api/admin/tool" && request.method === "POST")
         return isAdmin(request, env) ? withCors(await handleToolUpsert(request, env), cors) : unauthorized();
       if (p === "/api/admin/feed" && request.method === "POST")
@@ -755,11 +997,17 @@ export default {
         return isAdmin(request, env) ? withCors(await handleAdminPrompts(request, env), cors) : unauthorized();
       if (p === "/api/admin/prompt" && request.method === "POST")
         return isAdmin(request, env) ? withCors(await handlePromptAdmin(request, env, ctx), cors) : unauthorized();
+      if (p === "/api/admin/stickers" && request.method === "GET")
+        return isAdmin(request, env) ? withCors(await handleAdminStickers(request, env), cors) : unauthorized();
+      if (p === "/api/admin/sticker" && request.method === "POST")
+        return isAdmin(request, env) ? withCors(await handleStickerAdmin(request, env, ctx), cors) : unauthorized();
+      if (p === "/api/admin/sticker-comment" && request.method === "DELETE")
+        return isAdmin(request, env) ? withCors(await handleStickerCommentDelete(request, env, ctx), cors) : unauthorized();
       if (p === "/admin") return await handleAdmin(request, env);
       return new Response("not found", { status: 404 });
     } catch (e) {
-      // 提示词站路由出错时记服务端日志（尽力而为，不掩盖原始错误）
-      if (p.startsWith("/api/prompts")) {
+      // 提示词站/表情包站路由出错时记服务端日志（尽力而为，不掩盖原始错误）
+      if (p.startsWith("/api/prompts") || p.startsWith("/api/stickers")) {
         try {
           pfLog(env, ctx, {
             type: "error",

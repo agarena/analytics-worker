@@ -319,3 +319,42 @@ SQL 如下：
  '', '', 0, 'published', 'official',
  (strftime('%s','now')) * 1000, (strftime('%s','now')) * 1000)
 ON CONFLICT(id) DO NOTHING;
+
+
+-- ===== AI 表情包站官方内容（stickers.agarena.xyz）=====
+-- 与前端 js/data.js 兜底数据保持一致（两处需同步修改）。img 为仓库内相对路径，投稿图为 dataURL。
+INSERT INTO stickers (id, title, characters_json, tags_json, author, platform, source_url, img, likes, status, source, created_ts, updated_ts) VALUES
+('s07', '「DeepSeek 酱是看不到的～」全员合照', '["deepseek","chatgpt","claude","gemini","doubao"]', '["搞笑"]', 'GPT-Image 2 生成（网络收集）', '', '', 'assets/sticker-07.png', 402, 'published', 'official', 1789776000000, 1789776000000),
+('s05', '最强', '["deepseek"]', '["得意"]', '佚名（网络收集）', '', '', 'assets/sticker-05.png', 356, 'published', 'official', 1789776000000, 1789776000000),
+('s10', '吃白饭的蓝色大肥鱼', '["deepseek"]', '["搞笑","得意"]', '佚名（网络收集）', '', '', 'assets/sticker-10.jpg', 267, 'published', 'official', 1789776000000, 1789776000000),
+('s03', '看馋了', '["doubao"]', '["震惊","搞笑"]', '阿根廷神秘人（bilibili）', '', '', 'assets/sticker-03.png', 210, 'published', 'official', 1789776000000, 1789776000000),
+('s11', '原来是劣等模型', '["deepseek"]', '["生气"]', '佚名（网络收集）', '', '', 'assets/sticker-11.jpg', 198, 'published', 'official', 1789776000000, 1789776000000),
+('s08', '被窝里偷偷哭', '["deepseek"]', '["悲伤"]', '佚名（网络收集）', '', '', 'assets/sticker-08.jpg', 174, 'published', 'official', 1789776000000, 1789776000000),
+('s02', '豆包型人格：做事瞎糊弄', '["doubao"]', '["搞笑"]', '阿根廷神秘人（bilibili）', '', '', 'assets/sticker-02.png', 96, 'published', 'official', 1789776000000, 1789776000000),
+('s01', '深海女仆的 Token 花束', '["deepseek"]', '["开心","得意"]', '豆包 AI 生成（网络收集）', '', '', 'assets/sticker-01.png', 128, 'published', 'official', 1789776000000, 1789776000000),
+('s06', '好AI', '["deepseek"]', '["无语"]', '佚名（网络收集）', '', '', 'assets/sticker-06.png', 88, 'published', 'official', 1789776000000, 1789776000000),
+('s09', '水汪汪求放过', '["deepseek"]', '["悲伤"]', '佚名（网络收集）', '', '', 'assets/sticker-09.jpg', 143, 'published', 'official', 1789776000000, 1789776000000),
+('s04', '我就是区，结果不还是离不开我？', '["deepseek"]', '["得意"]', '佚名（网络收集）', '', '', 'assets/sticker-04.png', 154, 'published', 'official', 1789776000000, 1789776000000),
+('s12', '帮我生成：老大嫁作商人妇', '[]', '[]', '截图自豆包 App', '', '', 'assets/sticker-12.jpg', 121, 'published', 'official', 1789776000000, 1789776000000)
+ON CONFLICT(id) DO NOTHING;
+
+-- 预置评论（按 sticker_id+文本去重，时间取相对值换算）
+INSERT INTO sticker_comments (sticker_id, nick, text, ts) SELECT 's01', '赛博泡面', '这捧的 Token 花束比真花值钱（bushi', 1789516800000 WHERE NOT EXISTS (SELECT 1 FROM sticker_comments WHERE sticker_id='s01' AND text='这捧的 Token 花束比真花值钱（bushi');
+INSERT INTO sticker_comments (sticker_id, nick, text, ts) SELECT 's01', '深海鱼干', '女仆装鲸鱼娘，Settings 里见了都得多聊两句', 1789603200000 WHERE NOT EXISTS (SELECT 1 FROM sticker_comments WHERE sticker_id='s01' AND text='女仆装鲸鱼娘，Settings 里见了都得多聊两句');
+INSERT INTO sticker_comments (sticker_id, nick, text, ts) SELECT 's02', '匿名河豚', '做事瞎糊弄 被发现了就嬉皮笑脸道歉，太真实了', 1789344000000 WHERE NOT EXISTS (SELECT 1 FROM sticker_comments WHERE sticker_id='s02' AND text='做事瞎糊弄 被发现了就嬉皮笑脸道歉，太真实了');
+INSERT INTO sticker_comments (sticker_id, nick, text, ts) SELECT 's03', '鲸鱼 STOCK', '看馋了 +1，这就是传说中的 AI 相册吗', 1789689600000 WHERE NOT EXISTS (SELECT 1 FROM sticker_comments WHERE sticker_id='s03' AND text='看馋了 +1，这就是传说中的 AI 相册吗');
+INSERT INTO sticker_comments (sticker_id, nick, text, ts) SELECT 's03', '小葱拌豆腐', '已保存，发群里被夸了', 1789689600000 WHERE NOT EXISTS (SELECT 1 FROM sticker_comments WHERE sticker_id='s03' AND text='已保存，发群里被夸了');
+INSERT INTO sticker_comments (sticker_id, nick, text, ts) SELECT 's04', '开源自嘲bot', '「结果不还是离不开我」——时代的眼泪', 1789257600000 WHERE NOT EXISTS (SELECT 1 FROM sticker_comments WHERE sticker_id='s04' AND text='「结果不还是离不开我」——时代的眼泪');
+INSERT INTO sticker_comments (sticker_id, nick, text, ts) SELECT 's05', '最强观察员', '确实是【最强】（复读机', 1789430400000 WHERE NOT EXISTS (SELECT 1 FROM sticker_comments WHERE sticker_id='s05' AND text='确实是【最强】（复读机');
+INSERT INTO sticker_comments (sticker_id, nick, text, ts) SELECT 's05', '蒸馏水', '这两个字的书法比模型还强', 1789516800000 WHERE NOT EXISTS (SELECT 1 FROM sticker_comments WHERE sticker_id='s05' AND text='这两个字的书法比模型还强');
+INSERT INTO sticker_comments (sticker_id, nick, text, ts) SELECT 's06', '敷衍学十级', '「好AI」，职场夸夸万能句式', 1789603200000 WHERE NOT EXISTS (SELECT 1 FROM sticker_comments WHERE sticker_id='s06' AND text='「好AI」，职场夸夸万能句式');
+INSERT INTO sticker_comments (sticker_id, nick, text, ts) SELECT 's07', '识图模式', '合照名场面！五家同框，谁还不认识一眼', 1789772400000 WHERE NOT EXISTS (SELECT 1 FROM sticker_comments WHERE sticker_id='s07' AND text='合照名场面！五家同框，谁还不认识一眼');
+INSERT INTO sticker_comments (sticker_id, nick, text, ts) SELECT 's07', '绿发党', 'ChatGPT 娘被架起来的表情笑死我了', 1789689600000 WHERE NOT EXISTS (SELECT 1 FROM sticker_comments WHERE sticker_id='s07' AND text='ChatGPT 娘被架起来的表情笑死我了');
+INSERT INTO sticker_comments (sticker_id, nick, text, ts) SELECT 's07', 'Gemini 星星', '右下角那句「别担心嘛」才是精髓', 1789603200000 WHERE NOT EXISTS (SELECT 1 FROM sticker_comments WHERE sticker_id='s07' AND text='右下角那句「别担心嘛」才是精髓');
+INSERT INTO sticker_comments (sticker_id, nick, text, ts) SELECT 's08', '玻璃心收藏家', '被窝里偷偷哭，抱抱鲸鱼', 1789516800000 WHERE NOT EXISTS (SELECT 1 FROM sticker_comments WHERE sticker_id='s08' AND text='被窝里偷偷哭，抱抱鲸鱼');
+INSERT INTO sticker_comments (sticker_id, nick, text, ts) SELECT 's09', '水汪汪', '这眼神谁顶得住啊', 1789754400000 WHERE NOT EXISTS (SELECT 1 FROM sticker_comments WHERE sticker_id='s09' AND text='这眼神谁顶得住啊');
+INSERT INTO sticker_comments (sticker_id, nick, text, ts) SELECT 's10', '干饭人', '理直气壮.jpg，吃白饭也要吃得最响', 1789603200000 WHERE NOT EXISTS (SELECT 1 FROM sticker_comments WHERE sticker_id='s10' AND text='理直气壮.jpg，吃白饭也要吃得最响');
+INSERT INTO sticker_comments (sticker_id, nick, text, ts) SELECT 's10', '白饭杀手', '碗上还有鲸鱼印花，细节好评', 1789689600000 WHERE NOT EXISTS (SELECT 1 FROM sticker_comments WHERE sticker_id='s10' AND text='碗上还有鲸鱼印花，细节好评');
+INSERT INTO sticker_comments (sticker_id, nick, text, ts) SELECT 's11', '劣等模型本人', '被指着鼻子嘲讽了（', 1789344000000 WHERE NOT EXISTS (SELECT 1 FROM sticker_comments WHERE sticker_id='s11' AND text='被指着鼻子嘲讽了（');
+INSERT INTO sticker_comments (sticker_id, nick, text, ts) SELECT 's12', '麦城票根', '「老大嫁作商人妇」，麦城文学再+1', 1789430400000 WHERE NOT EXISTS (SELECT 1 FROM sticker_comments WHERE sticker_id='s12' AND text='「老大嫁作商人妇」，麦城文学再+1');
+INSERT INTO sticker_comments (sticker_id, nick, text, ts) SELECT 's12', '截图侠', '这prompt我学走了', 1789516800000 WHERE NOT EXISTS (SELECT 1 FROM sticker_comments WHERE sticker_id='s12' AND text='这prompt我学走了');

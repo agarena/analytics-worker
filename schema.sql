@@ -140,7 +140,8 @@ CREATE INDEX IF NOT EXISTS idx_pfb_ts ON prompt_feedback(ts);
 CREATE TABLE IF NOT EXISTS pf_logs (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   type       TEXT NOT NULL,
-  prompt_id  TEXT DEFAULT '',
+  site       TEXT DEFAULT 'prompts', -- prompts | stickers（区分来源站）
+  prompt_id  TEXT DEFAULT '',        -- 关联对象 id（提示词卡片或表情包）
   detail     TEXT DEFAULT '',       -- JSON，写入前截断 500 字符
   ip         TEXT,
   visitor_id TEXT,
@@ -150,3 +151,43 @@ CREATE TABLE IF NOT EXISTS pf_logs (
 );
 CREATE INDEX IF NOT EXISTS idx_pf_logs_ts   ON pf_logs(ts);
 CREATE INDEX IF NOT EXISTS idx_pf_logs_type ON pf_logs(type, day);
+
+-- ===== AI 表情包站（stickers.agarena.xyz）=====
+-- 官方收藏 + 访客投稿共用；投稿先审后显。官方图片走仓库 assets/ 相对路径，
+-- 投稿图片是前端压缩后的 dataURL（≤200KB），两种都存 img 列。
+
+CREATE TABLE IF NOT EXISTS stickers (
+  id              TEXT PRIMARY KEY,   -- 官方 s01… / 投稿 u+毫秒
+  title           TEXT NOT NULL,
+  characters_json TEXT DEFAULT '[]',  -- 角色 key 数组（合照多个；未知 key 前端以色块占位）
+  tags_json       TEXT DEFAULT '[]',
+  author          TEXT DEFAULT '',
+  platform        TEXT DEFAULT '',
+  source_url      TEXT DEFAULT '',
+  img             TEXT DEFAULT '',    -- assets/sticker-xx.png 或 dataURL(≤200KB)
+  likes           INTEGER DEFAULT 0,
+  status          TEXT DEFAULT 'published', -- pending | published | hidden
+  source          TEXT DEFAULT 'official',  -- official | user
+  created_ts      INTEGER,
+  updated_ts      INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_stickers_status ON stickers(status, updated_ts);
+
+CREATE TABLE IF NOT EXISTS sticker_likes (
+  sticker_id TEXT NOT NULL,
+  visitor_id TEXT NOT NULL,
+  ts         INTEGER,
+  PRIMARY KEY (sticker_id, visitor_id)
+);
+
+-- 表情包站公开评论区（留言即显，蜜罐+限流防刷；后台可删）
+CREATE TABLE IF NOT EXISTS sticker_comments (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  sticker_id TEXT NOT NULL,
+  nick       TEXT DEFAULT '匿名',
+  text       TEXT NOT NULL,
+  ip         TEXT,
+  visitor_id TEXT,
+  ts         INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_sticker_comments_sid ON sticker_comments(sticker_id, ts);
