@@ -688,7 +688,7 @@ async function handlePromptSubmit(request, env, ctx) {
   if (url && !/^https?:\/\/.+\..+/i.test(url)) url = "";
   let img = (body.img || "").toString();
   // 只接受前端压缩后的图片 dataURL，且 ≤200KB；否则丢弃（不影响文字投稿）
-  if (img && !(/^data:image\/(png|jpe?g|webp);base64,/.test(img) && img.length <= 200 * 1024)) img = "";
+  if (img && !(/^data:image\/(png|jpe?g|webp|gif);base64,/.test(img) && img.length <= 200 * 1024)) img = "";
   if (!title || !scene || !content)
     return Response.json({ ok: false, msg: "title/scene/content required" }, { status: 400 });
 
@@ -869,7 +869,7 @@ async function handleStickerSubmit(request, env, ctx) {
   const body = await request.json().catch(() => ({}));
   if (body.hp) return Response.json({ ok: true });
   let img = (body.img || "").toString();
-  if (img && !(/^data:image\/(png|jpe?g|webp);base64,/.test(img) && img.length <= 200 * 1024)) img = "";
+  if (img && !(/^data:image\/(png|jpe?g|webp|gif);base64,/.test(img) && img.length <= 200 * 1024)) img = "";
   if (!img) return Response.json({ ok: false, msg: "img required (dataURL ≤200KB)" }, { status: 400 });
   const title = (body.title || "").toString().trim().slice(0, 80) || "未命名表情";
   const chars = (Array.isArray(body.characters) ? body.characters : [])
