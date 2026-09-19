@@ -298,7 +298,7 @@ function renderAdmin(d, days, key) {
   return `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>分析后台</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script defer src="/admin-assets/chart.js"></script>
 <style>
 body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:#f6f8fb;color:#1f2733;margin:0;padding:24px;}
 h1{font-size:20px;} .wrap{max-width:960px;margin:0 auto;}

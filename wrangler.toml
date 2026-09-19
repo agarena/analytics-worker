@@ -21,3 +21,7 @@ database_id = "e24e9594-63cd-48ad-acff-f205515b2537"
 
 # 后台密码（不要写在这里，用 secret 设置）：
 #   wrangler secret put ADMIN_TOKEN
+
+# 后台静态资产（chart.js 自托管，摆脱 jsdelivr CDN 大陆阻塞）
+[assets]
+directory = "./public"
