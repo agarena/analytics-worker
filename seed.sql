@@ -15,6 +15,12 @@ INSERT INTO tools (slug, name, category, one_liner, sort, links_json, media_json
  2, '[{"kind":"open","url":"https://prompts.agarena.xyz/"}]',
  '[{"type":"image","url":"https://agarena.xyz/assets/tools/prompts-1.png","caption":"提示词卡片盒"},{"type":"image","url":"https://agarena.xyz/assets/tools/prompts-2.png","caption":"卡片详情与筛选"}]',
  '[{"question":"这是什么？","answer":"一个提示词卡片盒（Prompt Folio）：每张卡片写清使用场景、提示词正文与使用示例，看到合适的展开即可整体复制拿去就用。"},{"question":"怎么找到想要的提示词？","answer":"支持关键词搜索、标签筛选与三种排序（最新 / 最早 / 最多点赞）；每张卡片有序号，反馈时可精确关联。"},{"question":"我能投稿吗？","answer":"能。点「提交提示词」即可投稿，可附上抖音 / B站 / 微信公众号等引流账号获得署名展示；也欢迎对任何卡片提反馈。"}]',
+ 1789776000000),
+('ai-stickers', 'AI表情库', 'Sticker',
+ 'DeepSeek、豆包、ChatGPT 等模型角色的二创表情包一站式收录：按角色与情绪标签筛选，一键下载或复制，支持投稿你的收藏。',
+ 3, '[{"kind":"open","url":"https://stickers.agarena.xyz/"}]',
+ '[{"type":"image","url":"https://stickers.agarena.xyz/assets/sticker-01.png","caption":"深海女仆的 Token 花束"},{"type":"image","url":"https://stickers.agarena.xyz/assets/sticker-07.png","caption":"全员合照"}]',
+ '[{"question":"这是什么？","answer":"收录 DeepSeek、豆包、ChatGPT、Claude、Gemini 等模型角色的二创表情包，按角色与情绪标签筛选，点开即可下载原图或复制。"},{"question":"图片能商用吗？","answer":"二创作品版权归原作者所有，仅供个人聊天斗图与学习交流，非商业用途；侵权反馈会第一时间删除。"},{"question":"我能投稿吗？","answer":"能。点「投稿」上传图片并勾选角色标签，审核通过后公开展示；也欢迎在每张表情下评论。"}]',
  1789776000000)
 ON CONFLICT(slug) DO NOTHING;
 
