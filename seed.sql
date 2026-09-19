@@ -1,71 +1,194 @@
 -- 种子数据：与主页内置示例一致，保证接通后页面观感不变。
 -- 可重复执行（tools/site 冲突跳过，feed 按文本去重）。
 -- 日常修改请走 /api/admin/* 接口或直接 UPDATE，不必重跑本文件。
+-- 2026-09-19：工具精简为 2 个（token定价对比 + 优质提示词聚合网站），品牌改为「不吃鲸B」。
 
 INSERT INTO tools (slug, name, category, one_liner, sort, links_json, media_json, qa_json, updated_ts) VALUES
-('lumenvox', 'LumenVox', 'Voice',
- '把 60 秒清唱变成可商用的多语种配音与音色克隆，保留气声与情绪起伏。',
- 1, '[{"kind":"open","url":"#"}]', '[]',
- '[{"question":"需要准备什么?","answer":"一段 60 秒以上、背景干净的清晰人声即可开始克隆。"},{"question":"支持多少语言?","answer":"中、英、日、韩等 22 种语言，可跨语种保留同一音色。"},{"question":"能商用吗?","answer":"可用于商业配音，并附可追溯的音色来源说明。"}]',
- 1757000000000),
-('frameforge', 'FrameForge', 'Video',
- '从一段文字脚本自动生成带分镜、运镜与配乐的短视频初稿，一键导出成片。',
- 2, '[{"kind":"open","url":"#"}]', '[]',
- '[{"question":"输入什么?","answer":"粘贴一段文字脚本或要点，自动拆分镜与镜头。"},{"question":"出片要多久?","answer":"常见 30–60 秒短片，几分钟内得到带配乐的初稿。"},{"question":"能改吗?","answer":"分镜、运镜、配乐都可逐条重生成后再导出。"}]',
- 1757000000000),
-('cortex-chat', 'Cortex Chat', 'RAG',
- '接入你的私有知识库，给出带引用来源、可追溯原文的精准问答。',
- 3, '[{"kind":"open","url":"#"}]', '[]',
- '[{"question":"接哪些数据?","answer":"支持 PDF、Markdown、Notion、网页与数据库等私有知识源。"},{"question":"回答可信吗?","answer":"每条答案带引用来源，可一键跳转原文核对。"},{"question":"数据安全吗?","answer":"支持私有部署，知识库不外传，权限按人隔离。"}]',
- 1757000000000),
-('palette-diffusion', 'PaletteDiffusion', 'Image',
- '用一张品牌参考图，扩散出整套风格一致的视觉物料与配色体系。',
- 4, '[{"kind":"open","url":"#"}]', '[]',
- '[{"question":"需要几张参考图?","answer":"一张品牌主视觉即可起步，参考越多风格越稳。"},{"question":"一致性如何?","answer":"锁定配色与版式，批量产出海报、封面与社媒物料。"},{"question":"能换风格吗?","answer":"可微调参考权重或叠加第二参考，快速切换风格。"}]',
- 1757000000000),
-('codepilot-x', 'CodePilot X', 'Dev',
- '读懂整个仓库的上下文，在 IDE 里直接完成重构、写测试并开 PR。',
- 5, '[{"kind":"open","url":"#"}]', '[]',
- '[{"question":"能读多大项目?","answer":"解析整仓索引，理解跨文件的依赖与团队约定。"},{"question":"产出是什么?","answer":"直接给出可运行 diff、测试与 PR 说明。"},{"question":"安全吗?","answer":"支持本地/私有模型选项，代码不用于训练。"}]',
- 1757000000000),
-('insightboard', 'InsightBoard', 'Data',
- '用自然语言提问，秒级生成可下钻、可分享的交互式 BI 看板。',
- 6, '[{"kind":"open","url":"#"}]', '[]',
- '[{"question":"怎么提问?","answer":"用自然语言描述想看的数据，自动生成图表与 SQL。"},{"question":"能深挖吗?","answer":"支持点击下钻、维度筛选，并可保存分享看板。"},{"question":"连哪些数据源?","answer":"常见数据库、表格与 API，配置一次即可复用。"}]',
- 1757000000000),
-('musewrite', 'MuseWrite', 'Writing',
- '把零散素材与要点，整理成结构清晰的多版本长文与营销文案。',
- 7, '[{"kind":"open","url":"#"}]', '[]',
- '[{"question":"从什么开始?","answer":"丢入零散要点、录音或素材，先生成结构大纲。"},{"question":"能几种版本?","answer":"一键生成多个语气/长度版本，方便对比挑选。"},{"question":"会编造吗?","answer":"基于你给的事实扩展，并标注需要核实之处。"}]',
- 1757000000000)
+('model-price-compare', 'token定价对比', 'Data',
+ '16 家供应商、114 个模型、640+ 套餐统一折算成 ¥/百万 token，一眼找出最划算的 AI 模型套餐。',
+ 1, '[{"kind":"open","url":"https://price.agarena.xyz/"}]',
+ '[{"type":"image","url":"https://agarena.xyz/assets/tools/model-price-1.png","caption":"定价行情主表"},{"type":"image","url":"https://agarena.xyz/assets/tools/model-price-2.png","caption":"模型信息表"}]',
+ '[{"question":"这表能帮我做什么？","answer":"把订阅套餐和按量付费统一折算成 ¥/百万 token 比价，配合热门筛选、同模型排名、性价比指数，30 秒找到最适合的套餐。"},{"question":"数据多久更新？","answer":"持续跟进供应商调价，顶部显示更新日期，更新日志页记录每次变更；下单前以官方页面为准。"},{"question":"能按我的场景调吗？","answer":"能。页面顶部可即时调整汇率、缓存命中率、输入占比与评分基准，全表实时重算（只影响你的浏览，不改站内数据）；另支持筛选、排序、分面、只读 SQL 查询与 CSV 导出。"}]',
+ 1789776000000),
+('prompts', '优质提示词聚合网站', 'Prompt',
+ '把好用的 AI 提示词收进一张张卡片：使用场景、正文与示例齐备，看到合适的展开即可复制；支持搜索、标签筛选、点赞，还能投稿你的私藏提示词。',
+ 2, '[{"kind":"open","url":"https://prompts.agarena.xyz/"}]',
+ '[{"type":"image","url":"https://agarena.xyz/assets/tools/prompts-1.png","caption":"提示词卡片盒"},{"type":"image","url":"https://agarena.xyz/assets/tools/prompts-2.png","caption":"卡片详情与筛选"}]',
+ '[{"question":"这是什么？","answer":"一个提示词卡片盒（Prompt Folio）：每张卡片写清使用场景、提示词正文与使用示例，看到合适的展开即可整体复制拿去就用。"},{"question":"怎么找到想要的提示词？","answer":"支持关键词搜索、标签筛选与三种排序（最新 / 最早 / 最多点赞）；每张卡片有序号，反馈时可精确关联。"},{"question":"我能投稿吗？","answer":"能。点「提交提示词」即可投稿，可附上抖音 / B站 / 微信公众号等引流账号获得署名展示；也欢迎对任何卡片提反馈。"}]',
+ 1789776000000)
 ON CONFLICT(slug) DO NOTHING;
 
 INSERT INTO site (key, value) VALUES
-('brand_name', '舒狐 shufy'),
-('contact_email', 'hi@shufy.ai')
+('brand_name', '不吃鲸B'),
+('contact_email', 'agarena@agent.qq.com')
 ON CONFLICT(key) DO NOTHING;
 
 INSERT INTO feed (type, text, sort, created_ts)
-  SELECT 'update', 'LumenVox 新增 3 种中文方言音色', 1, 1757000000000
-  WHERE NOT EXISTS (SELECT 1 FROM feed WHERE text = 'LumenVox 新增 3 种中文方言音色');
+  SELECT 'update', 'token定价对比升级为在线查询版：筛选/排序/SQL 查询即开即用 → price.agarena.xyz', 1, 1789776000000
+  WHERE NOT EXISTS (SELECT 1 FROM feed WHERE text = 'token定价对比升级为在线查询版：筛选/排序/SQL 查询即开即用 → price.agarena.xyz');
 INSERT INTO feed (type, text, sort, created_ts)
-  SELECT 'news', '多模态模型上下文窗口突破百万 token', 2, 1757000000000
+  SELECT 'update', '新工具上线：优质提示词聚合网站 — 好用的提示词一张张收进卡片，展开即复制', 2, 1789776000000
+  WHERE NOT EXISTS (SELECT 1 FROM feed WHERE text = '新工具上线：优质提示词聚合网站 — 好用的提示词一张张收进卡片，展开即复制');
+INSERT INTO feed (type, text, sort, created_ts)
+  SELECT 'news', '多模态模型上下文窗口突破百万 token', 3, 1789776000000
   WHERE NOT EXISTS (SELECT 1 FROM feed WHERE text = '多模态模型上下文窗口突破百万 token');
 INSERT INTO feed (type, text, sort, created_ts)
-  SELECT 'update', 'FrameForge 上线自动配乐库 v2', 3, 1757000000000
-  WHERE NOT EXISTS (SELECT 1 FROM feed WHERE text = 'FrameForge 上线自动配乐库 v2');
-INSERT INTO feed (type, text, sort, created_ts)
-  SELECT 'soon', 'PaletteDiffusion 品牌套件内测招募中', 4, 1757000000000
-  WHERE NOT EXISTS (SELECT 1 FROM feed WHERE text = 'PaletteDiffusion 品牌套件内测招募中');
-INSERT INTO feed (type, text, sort, created_ts)
-  SELECT 'news', '开源社区发布新一代语音克隆基座', 5, 1757000000000
+  SELECT 'news', '开源社区发布新一代语音克隆基座', 4, 1789776000000
   WHERE NOT EXISTS (SELECT 1 FROM feed WHERE text = '开源社区发布新一代语音克隆基座');
 INSERT INTO feed (type, text, sort, created_ts)
-  SELECT 'update', 'Cortex Chat 支持引用一键溯源跳转', 6, 1757000000000
-  WHERE NOT EXISTS (SELECT 1 FROM feed WHERE text = 'Cortex Chat 支持引用一键溯源跳转');
-INSERT INTO feed (type, text, sort, created_ts)
-  SELECT 'news', '主流厂商下调推理 API 调用价格', 7, 1757000000000
+  SELECT 'news', '主流厂商下调推理 API 调用价格', 5, 1789776000000
   WHERE NOT EXISTS (SELECT 1 FROM feed WHERE text = '主流厂商下调推理 API 调用价格');
-INSERT INTO feed (type, text, sort, created_ts)
-  SELECT 'update', 'InsightBoard 新增自然语言下钻分析', 8, 1757000000000
-  WHERE NOT EXISTS (SELECT 1 FROM feed WHERE text = 'InsightBoard 新增自然语言下钻分析');
+
+-- ===== 提示词站官方内容（prompts.agarena.xyz）=====
+-- 与前端内置兜底数组保持一致（前端 fetch /api/prompts 失败时降级显示内置数据，两处需同步修改）。
+-- created_ts/updated_ts 按「距今天数」用 strftime 计算，仅首次插入生效（冲突跳过）。
+
+INSERT INTO prompts (id, no, title, author, platform, account, url, tags_json, scene, content, example, img, likes, status, source, created_ts, updated_ts) VALUES
+('pf01', 'PF-01', '公众号爆文结构生成器', '林晚', '微信公众号', '@林晚的文字铺', '',
+ '["写作","营销"]',
+ '当你要发布公众号深度长文、希望文章结构自带转发点时，请使用本提示词。',
+ '你是一位拥有十年经验的新媒体主编。请围绕「{主题}」写一篇公众号文章，严格遵循以下结构：
+1. 开头用一个具体的痛点场景切入，让读者立刻代入；
+2. 第二段抛出一个反常识的观点，制造认知冲突；
+3. 中间用三个小标题拆解方法论，每部分配一个真实案例；
+4. 结尾用一句可以单独转发的金句收束，并自然引导点赞在看。
+全文 1500 字左右，语气真诚克制，避免标题党和空洞口号。',
+ '输入：主题「为什么你总是存不下钱」
+输出：痛点场景开头 → 反常识观点「省钱的关键不是少花，而是先存后花」→ 三段方法论各配案例 → 金句收尾 + 引导在看。',
+ '', 342, 'published', 'official',
+ (strftime('%s','now') - 1*86400) * 1000, (strftime('%s','now') - 1*86400) * 1000),
+('pf02', 'PF-02', '代码评审助手（严格模式）', '周栈', '知乎', '@周栈', 'https://www.zhihu.com/people/zhouzhan',
+ '["编程","效率"]',
+ '当你要提交或评审一段重要代码、想在被追问之前先排掉隐患时，请使用本提示词。',
+ '你是一名以挑剔著称的资深工程师。请对下面的代码进行严格评审，按以下维度逐条列出问题：
+- 潜在 bug（边界条件、空值、并发）；
+- 性能隐患（不必要的循环、内存分配）；
+- 可读性（命名、职责划分、重复代码）。
+每个问题请标注严重级别（阻断 / 重要 / 建议），给出具体行号和修改示例。最后输出一段总体评价和重构优先级建议。不要客套，直接指出问题。代码如下：
+```{代码}```',
+ '输入：一段 40 行的用户注册接口代码
+输出：阻断问题 1 个（手机号未校验格式）、重要问题 2 个、建议 3 条，附行号与修改 diff。',
+ '', 518, 'published', 'official',
+ (strftime('%s','now') - 2*86400) * 1000, (strftime('%s','now') - 2*86400) * 1000),
+('pf03', 'PF-03', 'SQL 查询逐行解释器', 'Ada 王', 'Bilibili', '@Ada王讲数据', 'https://space.bilibili.com/390214857',
+ '["编程","数据分析"]',
+ '当你拿到一条看不懂的 SQL、或要向别人解释它的作用时，请使用本提示词。',
+ '你是一位耐心的数据库讲师。请逐行解释下面这条 SQL 查询：每一行在做什么、为什么这样写、有没有更优的替代写法。然后用一段话总结整条查询的业务含义，并指出至少一个潜在的性能问题（比如缺少索引、隐式类型转换），给出优化后的版本。
+SQL 如下：
+```{SQL}```',
+ '输入：一条三层嵌套的 GROUP BY 查询
+输出：逐行含义 + 业务总结「统计各渠道近 30 天下单转化率」+ 优化建议（建复合索引）。',
+ '', 276, 'published', 'official',
+ (strftime('%s','now') - 3*86400) * 1000, (strftime('%s','now') - 3*86400) * 1000),
+('pf04', 'PF-04', '周报 60 秒生成器', '拖延症晚期', '小红书', '@下班后的阿拖', 'https://www.xiaohongshu.com/user/profile/5e2b1c8a0000000001003f2a',
+ '["效率","写作"]',
+ '当你周五下班前要交周报、手上只有一堆零散要点时，请使用本提示词。',
+ '请把我的工作要点整理成一份结构清晰的周报。输入是我随手列的要点：
+{要点}
+要求：
+1. 按「本周完成 / 进行中 / 下周计划 / 需要支持」四段输出；
+2. 每项以动词开头，一句话说完，突出结果而非过程；
+3. 涉及数据的地方用具体数字；
+4. 整体控制在 300 字以内，语气专业不浮夸；
+5. 最后给一句 50 字以内的向上汇报口径，方便我口头同步给领导。',
+ '输入：①完成订单导出功能 ②跟进 3 个客户反馈 ③下周想做退款流程优化
+输出：四段式周报 + 一句口头汇报口径。',
+ '', 891, 'published', 'official',
+ (strftime('%s','now') - 4*86400) * 1000, (strftime('%s','now') - 4*86400) * 1000),
+('pf05', 'PF-05', '产品需求文档润色师', '沈青', '微信公众号', '@沈青产品笔记', '',
+ '["产品","写作"]',
+ '当你写完 PRD 草稿、担心开发同学读完仍有歧义时，请使用本提示词。',
+ '你是一位资深产品经理。请润色下面这段 PRD 草稿，目标是让开发同学读完零歧义：
+{PRD 内容}
+请检查并修正：
+1. 需求背景是否说清了「为什么做」；
+2. 功能描述是否可验收（补充验收标准 Given/When/Then）；
+3. 边界情况和异常流程是否覆盖（空态、超时、权限不足）；
+4. 删掉所有形容词，只保留事实和规则。
+输出润色后的完整版本，并在文末列出你改动的三个关键点。',
+ '', '', 154, 'published', 'official',
+ (strftime('%s','now') - 6*86400) * 1000, (strftime('%s','now') - 6*86400) * 1000),
+('pf06', 'PF-06', '中文描述转 Midjourney 提示词', '陆离', 'Bilibili', '@陆离的调色盘', 'https://space.bilibili.com/20473861',
+ '["设计","创意"]',
+ '当你脑子里有画面、但不知道怎么写成 AI 绘画提示词时，请使用本提示词。',
+ '你是一位 AI 绘画提示词专家。请把我的中文画面描述翻译成一条高质量的 Midjourney 英文提示词，严格按照这个顺序组织：
+主体（谁，在做什么）→ 环境（时间、地点、氛围）→ 光线（方向、质感）→ 风格（媒介、参考艺术家或流派）→ 构图与镜头（视角、焦段）→ 参数（--ar 宽高比 --v 版本 --s 风格化）。
+要求：用具体名词替代抽象形容词；主体特征放在最前；给出 2 个不同风格的版本供我选择。
+我的描述：{中文描述}',
+ '输入：一只在图书馆打瞌睡的橘猫
+输出：版本 A 吉卜力水彩风、版本 B 赛博霓虹风，均含 --ar 16:9 --v 6 参数。',
+ '', 623, 'published', 'official',
+ (strftime('%s','now') - 8*86400) * 1000, (strftime('%s','now') - 8*86400) * 1000),
+('pf07', 'PF-07', '文言文今译互转', '顾之', '知乎', '@顾之', 'https://www.zhihu.com/people/guzhi',
+ '["翻译","学习"]',
+ '当你读到一段文言文想彻底读懂、或想把自己的文字译成文言时，请使用本提示词。',
+ '你是一位精通古代汉语的学者。请完成以下任务：
+若输入文言文：先逐句对译成现代汉语，再整体润色为通顺白话，最后注释其中的实词活用、特殊句式和文化常识（至少 3 处）。
+若输入现代文：改写为文从字顺的文言文，注明用了哪些文言虚词和句式。
+翻译以「信、达、雅」为序，宁可质朴不可错译。原文如下：
+{原文}',
+ '', '', 208, 'published', 'official',
+ (strftime('%s','now') - 11*86400) * 1000, (strftime('%s','now') - 11*86400) * 1000),
+('pf08', 'PF-08', '面试反问环节设计', '榛果', '小红书', '@榛果求职', 'https://www.xiaohongshu.com/user/profile/6021c98b0000000001017c88',
+ '["求职","效率"]',
+ '当面试接近尾声、面试官问你「还有什么想问的」时，请使用本提示词。',
+ '你是一位资深职业规划师。我即将面试「{岗位}」职位，公司行业是「{行业}」，面试轮次是「{第几轮}」。
+请帮我设计 5 个反问面试官的问题，要求：
+1. 前 2 个展现我对岗位的理解深度；
+2. 第 3 个了解团队协作方式和直属领导风格；
+3. 第 4 个判断岗位的成长空间和考核标准；
+4. 最后 1 个留下好印象的收尾问题。
+每个问题附一句「为什么要问这个」的说明。',
+ '输入：岗位「产品经理」、行业「跨境电商」、第三轮（总监面）
+输出：5 个分目的反问问题，每个附提问理由。',
+ '', 445, 'published', 'official',
+ (strftime('%s','now') - 13*86400) * 1000, (strftime('%s','now') - 13*86400) * 1000),
+('pf09', 'PF-09', '会议纪要 30 秒提炼', '大周', '个人微信号', 'zhou-biji', '',
+ '["效率"]',
+ '当你开完一场信息量很大的会、需要快速沉淀纪要与行动项时，请使用本提示词。',
+ '请把下面的会议记录整理成结构化纪要：
+{会议记录}
+输出格式：
+【结论】今天拍板了哪几件事，一句话一条；
+【行动项】表格：事项 / 负责人 / 截止时间，只收录有明确责任人的事项；
+【悬而未决】哪些问题没结论，下次会议需要带什么信息来推进；
+【风险提示】我注意到的任何资源或时间风险。
+只记录事实，不要脑补记录里没有的信息。',
+ '', '', 367, 'published', 'official',
+ (strftime('%s','now') - 16*86400) * 1000, (strftime('%s','now') - 16*86400) * 1000),
+('pf10', 'PF-10', '小红书标题 A/B 生成', '桃沢', '小红书', '@桃沢运营手记', 'https://www.xiaohongshu.com/user/profile/5f8a2b1c0000000001019d11',
+ '["营销","写作"]',
+ '当你笔记内容写好了、卡在标题不知道怎么起时，请使用本提示词。',
+ '你是小红书头部操盘手。我的笔记主题是「{主题}」，目标人群是「{人群}」。
+请生成 10 个标题，分 5 组 A/B 对照：
+1. 数字型 vs 悬念型；
+2. 痛点型 vs 利益型；
+3. 第一人称经历型 vs 干货清单型。
+每个标题 20 字以内，符合小红书语气，避免夸张违禁词。最后告诉我你会先测哪两组，以及判断依据。',
+ '', '', 289, 'published', 'official',
+ (strftime('%s','now') - 20*86400) * 1000, (strftime('%s','now') - 20*86400) * 1000),
+('pf11', 'PF-11', '费曼学习法讲解任何概念', '陈默', '知乎', '@陈默说学习', 'https://www.zhihu.com/people/chenmoshuo',
+ '["学习"]',
+ '当你学了一个新概念感觉懂了、想验证自己是不是真懂时，请使用本提示词。',
+ '请用费曼学习法向我讲解「{概念}」。分四步：
+1. 用最朴素的语言解释，就像讲给 12 岁孩子听，禁止使用任何专业术语；
+2. 用一个生活里的类比帮我建立直觉；
+3. 回到严谨表述，指出我朴素理解里会出错的一个地方；
+4. 出 3 道由浅入深的自测题，让我确认真的懂了。
+如果这个概念有常见误解，请单独列出来辨析。',
+ '输入：区块链
+输出：给 12 岁孩子的解释 + 「全村记账本」类比 + 常见误解辨析 + 3 道自测题。',
+ '', 512, 'published', 'official',
+ (strftime('%s','now') - 24*86400) * 1000, (strftime('%s','now') - 24*86400) * 1000),
+('pf12', 'PF-12', '正则表达式构造器', '老白', 'Bilibili', '@老白敲代码', 'https://space.bilibili.com/16681129',
+ '["编程"]',
+ '当你要写正则但只会死记硬背、担心写出灾难性回溯时，请使用本提示词。',
+ '你是正则表达式专家。我想匹配以下文本规则：「{用自然语言描述匹配规则}」。
+请：
+1. 给出正则表达式，并逐段解释每个符号的作用；
+2. 列出 3 个能匹配和 2 个不能匹配的具体例子；
+3. 指出这个正则可能的性能陷阱（如灾难性回溯）并给出更安全的写法；
+4. 同时给出 JavaScript 和 Python 两种用法示例。',
+ '', '', 198, 'published', 'official',
+ (strftime('%s','now') - 28*86400) * 1000, (strftime('%s','now') - 28*86400) * 1000)
+ON CONFLICT(id) DO NOTHING;

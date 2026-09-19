@@ -89,3 +89,64 @@ CREATE TABLE IF NOT EXISTS site (
   key   TEXT PRIMARY KEY,           -- brand_name / contact_email
   value TEXT
 );
+
+-- ===== 提示词聚合网站（prompts.agarena.xyz）=====
+-- 内容表：官方提示词 + 访客投稿共用，投稿先审后显（status=pending）。
+-- 展示编号 no 在审核通过时才分配（pending 期为 NULL，UNIQUE 允许多个 NULL）。
+
+CREATE TABLE IF NOT EXISTS prompts (
+  id         TEXT PRIMARY KEY,      -- 官方 pf01… / 投稿 u+毫秒时间戳
+  no         TEXT UNIQUE,           -- 展示编号 PF-01；投稿通过审核时分配
+  title      TEXT NOT NULL,
+  author     TEXT DEFAULT '',
+  platform   TEXT DEFAULT '',
+  account    TEXT DEFAULT '',
+  url        TEXT DEFAULT '',
+  tags_json  TEXT DEFAULT '[]',
+  scene      TEXT DEFAULT '',
+  content    TEXT NOT NULL,
+  example    TEXT DEFAULT '',
+  img        TEXT DEFAULT '',       -- 配图 dataURL（≤200KB，前端压缩）或图片 URL
+  likes      INTEGER DEFAULT 0,
+  status     TEXT DEFAULT 'published', -- pending | published | hidden
+  source     TEXT DEFAULT 'official',  -- official | user
+  created_ts INTEGER,
+  updated_ts INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_prompts_status ON prompts(status, updated_ts);
+
+-- 点赞去重：同一访客对同一提示词只算一票，可再点取消
+CREATE TABLE IF NOT EXISTS prompt_likes (
+  prompt_id  TEXT NOT NULL,
+  visitor_id TEXT NOT NULL,         -- 前端 localStorage 匿名 id（复用主站 shufy_anon）
+  ts         INTEGER,
+  PRIMARY KEY (prompt_id, visitor_id)
+);
+
+-- 提示词站内反馈（评价/建议/问题，可关联某张卡片），不公开，仅后台可见
+CREATE TABLE IF NOT EXISTS prompt_feedback (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  kind       TEXT DEFAULT '评价',    -- 评价 | 建议 | 问题
+  prompt_id  TEXT DEFAULT '',
+  message    TEXT NOT NULL,
+  ip         TEXT,
+  visitor_id TEXT,
+  ts         INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_pfb_ts ON prompt_feedback(ts);
+
+-- 关键节点日志：前端行为（page_view/search/copy/like/share/submit/feedback…）
+-- + 服务端错误（type='error'）+ 管理操作（type='admin_*'），一张表按 type 区分
+CREATE TABLE IF NOT EXISTS pf_logs (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  type       TEXT NOT NULL,
+  prompt_id  TEXT DEFAULT '',
+  detail     TEXT DEFAULT '',       -- JSON，写入前截断 500 字符
+  ip         TEXT,
+  visitor_id TEXT,
+  session_id TEXT,
+  day        TEXT,                  -- YYYY-MM-DD，便于按天聚合
+  ts         INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_pf_logs_ts   ON pf_logs(ts);
+CREATE INDEX IF NOT EXISTS idx_pf_logs_type ON pf_logs(type, day);

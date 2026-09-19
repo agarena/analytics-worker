@@ -11,7 +11,7 @@ routes = [
 # 只放行你自己的托管源；其他网站的跨域请求会被浏览器拒绝。
 # 若需新增来源，在此追加即可。
 [vars]
-ALLOW_ORIGIN = "https://agarena.github.io,https://agarena.xyz,https://www.agarena.xyz,https://e86da65200354d31a446550366fc818e.app.workbuddy.link"
+ALLOW_ORIGIN = "https://agarena.github.io,https://agarena.xyz,https://www.agarena.xyz,https://prompts.agarena.xyz,https://stickers.agarena.xyz,https://e86da65200354d31a446550366fc818e.app.workbuddy.link"
 
 [[d1_databases]]
 binding = "DB"
