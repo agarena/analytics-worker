@@ -570,7 +570,7 @@ function rateLimit(request, extra) {
 }
 
 // 点赞/取消：prompt_likes 去重表 + prompts.likes 计数，batch 保证一致
-async function handlePromptLike(request, env) {
+async function handlePromptLike(request, env, ctx) {
   if (!rateLimit(request)) return Response.json({ ok: false, msg: "rate limited" }, { status: 429 });
   const body = await request.json().catch(() => ({}));
   const id = (body.id || "").toString().slice(0, 60);
@@ -594,13 +594,13 @@ async function handlePromptLike(request, env) {
     ]);
   }
   const row = await env.DB.prepare(`SELECT likes FROM prompts WHERE id = ?`).bind(id).first();
-  pfLog(env, null, {
+  pfLog(env, ctx, {
     type: wantLike ? "like" : "unlike",
     prompt_id: id,
     ip: clientIp(request),
     visitor_id: vid,
     ts: now,
-  }).catch(() => {});
+  });
   return Response.json({ ok: true, liked: wantLike, likes: row ? row.likes : null });
 }
 
@@ -739,7 +739,7 @@ export default {
       if (p === "/api/collect" && request.method === "POST") return withCors(await handleCollect(request, env), cors);
       // 提示词聚合网站
       if (p === "/api/prompts" && request.method === "GET") return withCors(await handlePromptsList(env), cors);
-      if (p === "/api/prompts/like" && request.method === "POST") return withCors(await handlePromptLike(request, env), cors);
+      if (p === "/api/prompts/like" && request.method === "POST") return withCors(await handlePromptLike(request, env, ctx), cors);
       if (p === "/api/prompts/submit" && request.method === "POST") return withCors(await handlePromptSubmit(request, env, ctx), cors);
       if (p === "/api/prompts/feedback" && request.method === "POST") return withCors(await handlePromptFeedback(request, env, ctx), cors);
       if (p === "/api/prompts/log" && request.method === "POST") return withCors(await handlePromptLog(request, env), cors);
