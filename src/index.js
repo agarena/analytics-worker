@@ -709,7 +709,7 @@ async function handlePromptSubmit(request, env, ctx) {
      VALUES (?,?,?,?,?,?,?,?,?,?,?,0,'pending','user',?,?)`
   )
     .bind(
-      id, title, account || "未知@网络", platform, account, url,
+      id, title, account || "未知", platform || "网络", account, url,
       JSON.stringify(["投稿"]), scene, content, example, img, now, now
     )
     .run();
@@ -912,7 +912,7 @@ async function handleStickerSubmit(request, env, ctx) {
     `INSERT INTO stickers (id, title, characters_json, tags_json, author, platform, source_url, img, likes, status, source, created_ts, updated_ts, phash)
      VALUES (?,?,?,?,?,?,?,?,0,'pending','user',?,?,?)`
   )
-    .bind(id, title, JSON.stringify(chars), JSON.stringify(tags), author, platform, srcUrl, img, now, now, phash || null)
+    .bind(id, title, JSON.stringify(chars), JSON.stringify(tags), author || "未知", platform || "网络", srcUrl, img, now, now, phash || null)
     .run();
   pfLog(env, ctx, { type: "submit", site: "stickers", prompt_id: id, ip: clientIp(request), visitor_id: body.vid, detail: { title, chars } });
   return Response.json({ ok: true, id });
