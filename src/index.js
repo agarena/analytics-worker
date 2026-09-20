@@ -767,11 +767,49 @@ async function handleAdminPrompts(request, env) {
   return Response.json({ ok: true, items: r.results || [] });
 }
 
-// 管理：publish（分配下一可用 PF 编号）/ hide / delete（连带清点赞）
+// 管理：publish（分配下一可用 PF 编号）/ hide / delete（连带清点赞）/ create（免审直发）
 async function handlePromptAdmin(request, env, ctx) {
   const b = await request.json().catch(() => null);
-  const id = b && (b.id || "").toString().slice(0, 60);
   const action = b && b.action;
+
+  // create：可信方（持 ADMIN_KEY）提交即上架，跳过待审；去重仍生效
+  if (action === "create") {
+    const title = (b.title || "").toString().trim().slice(0, 80);
+    const scene = (b.scene || "").toString().trim().slice(0, 300);
+    const content = (b.content || "").toString().trim().slice(0, 6000);
+    if (!title || !scene || !content)
+      return Response.json({ ok: false, msg: "title/scene/content required" }, { status: 400 });
+    const norm = (t) => t.toString().toLowerCase().replace(/\s+/g, "");
+    const normIn = norm(content);
+    const exist = await env.DB.prepare(`SELECT id, no, title, content FROM prompts WHERE status IN ('pending','published')`).all();
+    for (const row of exist.results || []) {
+      if (norm(row.content || "") === normIn)
+        return Response.json({ ok: false, msg: "duplicate", existing: { id: row.id, no: row.no, title: row.title } }, { status: 409 });
+    }
+    const rows = await env.DB.prepare(`SELECT no FROM prompts WHERE no LIKE 'PF-%'`).all();
+    const used = new Set((rows.results || []).map((x) => parseInt(String(x.no).slice(3), 10)).filter((n) => !isNaN(n)));
+    let n = 1;
+    while (used.has(n)) n++;
+    const no = "PF-" + String(n).padStart(2, "0");
+    const now = Date.now();
+    const id = "u" + now;
+    const source = b.source === "official" ? "official" : "user";
+    await env.DB.prepare(
+      `INSERT INTO prompts (id, no, title, author, platform, account, url, tags_json, scene, content, example, img, likes, status, source, created_ts, updated_ts)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,0,'published',?,?,?)`
+    )
+      .bind(
+        id, no, title, (b.author || "未知").toString().slice(0, 40), (b.platform || "网络").toString().slice(0, 40),
+        (b.account || "").toString().slice(0, 60), (b.url || "").toString().slice(0, 300),
+        JSON.stringify(Array.isArray(b.tags) ? b.tags.map((t) => String(t).slice(0, 16)).filter(Boolean).slice(0, 6) : ["投稿"]),
+        scene, content, (b.example || "").toString().slice(0, 2000), (b.img || "").toString(), source, now, now
+      )
+      .run();
+    pfLog(env, ctx, { type: "admin_create", prompt_id: id, detail: { title, no } });
+    return Response.json({ ok: true, id, no });
+  }
+
+  const id = b && (b.id || "").toString().slice(0, 60);
   if (!id || !["publish", "hide", "delete"].includes(action))
     return Response.json({ ok: false, msg: "id/action required" }, { status: 400 });
 
@@ -821,6 +859,7 @@ async function handleStickersList(env) {
     sourceUrl: x.source_url || "",
     likes: x.likes || 0,
     added: x.created_ts ? new Date(x.created_ts).toISOString().slice(0, 10) : "",
+    created_ts: x.created_ts || 0,
     ts: x.updated_ts || x.created_ts || 0,
   }));
   return jsonRes(list, 60);
@@ -946,16 +985,69 @@ async function handleAdminStickers(request, env) {
   return Response.json({ ok: true, items: r.results || [] });
 }
 
-// 管理：publish / hide / delete（删除连带清点赞与评论）
+// 管理：publish / hide / delete（删除连带清点赞与评论）/ create（免审直发）
 async function handleStickerAdmin(request, env, ctx) {
   const b = await request.json().catch(() => null);
-  const id = b && (b.id || "").toString().slice(0, 60);
   const action = b && b.action;
+
+  // create：可信方提交即上架；img 校验与感知哈希去重仍然生效
+  if (action === "create") {
+    let img = (b.img || "").toString();
+    if (img && !(/^data:image\/(png|jpe?g|webp|gif);base64,/.test(img) && img.length <= 200 * 1024)) img = "";
+    if (!img) return Response.json({ ok: false, msg: "img required (dataURL ≤200KB)" }, { status: 400 });
+    const title = (b.title || "").toString().trim().slice(0, 80) || "未命名表情";
+    const chars = (Array.isArray(b.characters) ? b.characters : [])
+      .map((c) => String(c).trim().toLowerCase().slice(0, 24)).filter(Boolean).slice(0, 5);
+    const tags = (Array.isArray(b.tags) ? b.tags : [])
+      .map((t) => String(t).trim().replace(/^#/, "").slice(0, 16)).filter(Boolean).slice(0, 6);
+    let phash = (b.hash || "").toString().toLowerCase().slice(0, 16);
+    if (!/^[0-9a-f]{16}$/.test(phash)) phash = "";
+    if (phash) {
+      const exist = await env.DB.prepare(
+        `SELECT id, title, phash FROM stickers WHERE status IN ('pending','published') AND phash IS NOT NULL`
+      ).all();
+      const ham = (a, b2) => { let d = 0; for (let i = 0; i < 16; i++) { let x = parseInt(a[i], 16) ^ parseInt(b2[i], 16); while (x) { d += x & 1; x >>= 1; } } return d; };
+      for (const row of exist.results || []) {
+        if (row.phash && ham(phash, row.phash) <= 6)
+          return Response.json({ ok: false, msg: "duplicate", existing: { id: row.id, title: row.title } }, { status: 409 });
+      }
+    }
+    const now = Date.now();
+    const id = "u" + now;
+    const source = b.source === "official" ? "official" : "user";
+    await env.DB.prepare(
+      `INSERT INTO stickers (id, title, characters_json, tags_json, author, platform, source_url, img, likes, status, source, created_ts, updated_ts, phash)
+       VALUES (?,?,?,?,?,?,?,?,0,'published',?,?,?,?)`
+    )
+      .bind(id, title, JSON.stringify(chars), JSON.stringify(tags),
+            (b.author || "未知").toString().slice(0, 40), (b.platform || "网络").toString().slice(0, 20),
+            (b.sourceUrl || "").toString().slice(0, 300), img, source, now, now, phash || null)
+      .run();
+    pfLog(env, ctx, { type: "admin_create", site: "stickers", prompt_id: id, detail: { title } });
+    return Response.json({ ok: true, id });
+  }
+
+  const id = b && (b.id || "").toString().slice(0, 60);
   if (!id || !["publish", "hide", "delete"].includes(action))
     return Response.json({ ok: false, msg: "id/action required" }, { status: 400 });
 
   if (action === "publish") {
-    await env.DB.prepare(`UPDATE stickers SET status='published', updated_ts=? WHERE id=?`).bind(Date.now(), id).run();
+    // 审核时可顺带补全角色/标签（自动审核流程用）：传了就覆盖，不传保持原值
+    const sets = [`status='published'`, `updated_ts=?`];
+    const binds = [Date.now()];
+    if (Array.isArray(b.characters)) {
+      const chars = b.characters.map((c) => String(c).trim().toLowerCase().slice(0, 24)).filter(Boolean).slice(0, 5);
+      sets.push(`characters_json=?`); binds.push(JSON.stringify(chars));
+    }
+    if (Array.isArray(b.tags)) {
+      const tags = b.tags.map((t) => String(t).trim().replace(/^#/, "").slice(0, 16)).filter(Boolean).slice(0, 6);
+      sets.push(`tags_json=?`); binds.push(JSON.stringify(tags));
+    }
+    if (typeof b.title === "string" && b.title.trim()) {
+      sets.push(`title=?`); binds.push(b.title.trim().slice(0, 80));
+    }
+    binds.push(id);
+    await env.DB.prepare(`UPDATE stickers SET ${sets.join(", ")} WHERE id=?`).bind(...binds).run();
     pfLog(env, ctx, { type: "admin_publish", site: "stickers", prompt_id: id });
     return Response.json({ ok: true });
   }
