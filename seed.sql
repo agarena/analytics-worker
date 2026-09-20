@@ -50,7 +50,7 @@ INSERT INTO feed (type, text, sort, created_ts)
 -- created_ts/updated_ts 按「距今天数」用 strftime 计算，仅首次插入生效（冲突跳过）。
 
 INSERT INTO prompts (id, no, title, author, platform, account, url, tags_json, scene, content, example, img, likes, status, source, created_ts, updated_ts) VALUES
-('pf01', 'PF-01', '公众号爆文结构生成器', '林晚', '微信公众号', '@林晚的文字铺', '',
+('pf01', 'PF-01', '公众号爆文结构生成器', '未知@网络', '微信公众号', '@林晚的文字铺', '',
  '["写作","营销"]',
  '当你要发布公众号深度长文、希望文章结构自带转发点时，请使用本提示词。',
  '你是一位拥有十年经验的新媒体主编。请围绕「{主题}」写一篇公众号文章，严格遵循以下结构：
@@ -63,7 +63,7 @@ INSERT INTO prompts (id, no, title, author, platform, account, url, tags_json, s
 输出：痛点场景开头 → 反常识观点「省钱的关键不是少花，而是先存后花」→ 三段方法论各配案例 → 金句收尾 + 引导在看。',
  '', 342, 'published', 'official',
  (strftime('%s','now') - 1*86400) * 1000, (strftime('%s','now') - 1*86400) * 1000),
-('pf02', 'PF-02', '代码评审助手（严格模式）', '周栈', '知乎', '@周栈', 'https://www.zhihu.com/people/zhouzhan',
+('pf02', 'PF-02', '代码评审助手（严格模式）', '未知@网络', '知乎', '@周栈', 'https://www.zhihu.com/people/zhouzhan',
  '["编程","效率"]',
  '当你要提交或评审一段重要代码、想在被追问之前先排掉隐患时，请使用本提示词。',
  '你是一名以挑剔著称的资深工程师。请对下面的代码进行严格评审，按以下维度逐条列出问题：
@@ -76,7 +76,7 @@ INSERT INTO prompts (id, no, title, author, platform, account, url, tags_json, s
 输出：阻断问题 1 个（手机号未校验格式）、重要问题 2 个、建议 3 条，附行号与修改 diff。',
  '', 518, 'published', 'official',
  (strftime('%s','now') - 2*86400) * 1000, (strftime('%s','now') - 2*86400) * 1000),
-('pf03', 'PF-03', 'SQL 查询逐行解释器', 'Ada 王', 'Bilibili', '@Ada王讲数据', 'https://space.bilibili.com/390214857',
+('pf03', 'PF-03', 'SQL 查询逐行解释器', '未知@网络', 'Bilibili', '@Ada王讲数据', 'https://space.bilibili.com/390214857',
  '["编程","数据分析"]',
  '当你拿到一条看不懂的 SQL、或要向别人解释它的作用时，请使用本提示词。',
  '你是一位耐心的数据库讲师。请逐行解释下面这条 SQL 查询：每一行在做什么、为什么这样写、有没有更优的替代写法。然后用一段话总结整条查询的业务含义，并指出至少一个潜在的性能问题（比如缺少索引、隐式类型转换），给出优化后的版本。
@@ -86,7 +86,7 @@ SQL 如下：
 输出：逐行含义 + 业务总结「统计各渠道近 30 天下单转化率」+ 优化建议（建复合索引）。',
  '', 276, 'published', 'official',
  (strftime('%s','now') - 3*86400) * 1000, (strftime('%s','now') - 3*86400) * 1000),
-('pf04', 'PF-04', '周报 60 秒生成器', '拖延症晚期', '小红书', '@下班后的阿拖', 'https://www.xiaohongshu.com/user/profile/5e2b1c8a0000000001003f2a',
+('pf04', 'PF-04', '周报 60 秒生成器', '未知@网络', '小红书', '@下班后的阿拖', 'https://www.xiaohongshu.com/user/profile/5e2b1c8a0000000001003f2a',
  '["效率","写作"]',
  '当你周五下班前要交周报、手上只有一堆零散要点时，请使用本提示词。',
  '请把我的工作要点整理成一份结构清晰的周报。输入是我随手列的要点：
@@ -101,7 +101,7 @@ SQL 如下：
 输出：四段式周报 + 一句口头汇报口径。',
  '', 891, 'published', 'official',
  (strftime('%s','now') - 4*86400) * 1000, (strftime('%s','now') - 4*86400) * 1000),
-('pf05', 'PF-05', '产品需求文档润色师', '沈青', '微信公众号', '@沈青产品笔记', '',
+('pf05', 'PF-05', '产品需求文档润色师', '未知@网络', '微信公众号', '@沈青产品笔记', '',
  '["产品","写作"]',
  '当你写完 PRD 草稿、担心开发同学读完仍有歧义时，请使用本提示词。',
  '你是一位资深产品经理。请润色下面这段 PRD 草稿，目标是让开发同学读完零歧义：
@@ -114,7 +114,7 @@ SQL 如下：
 输出润色后的完整版本，并在文末列出你改动的三个关键点。',
  '', '', 154, 'published', 'official',
  (strftime('%s','now') - 6*86400) * 1000, (strftime('%s','now') - 6*86400) * 1000),
-('pf06', 'PF-06', '中文描述转 Midjourney 提示词', '陆离', 'Bilibili', '@陆离的调色盘', 'https://space.bilibili.com/20473861',
+('pf06', 'PF-06', '中文描述转 Midjourney 提示词', '未知@网络', 'Bilibili', '@陆离的调色盘', 'https://space.bilibili.com/20473861',
  '["设计","创意"]',
  '当你脑子里有画面、但不知道怎么写成 AI 绘画提示词时，请使用本提示词。',
  '你是一位 AI 绘画提示词专家。请把我的中文画面描述翻译成一条高质量的 Midjourney 英文提示词，严格按照这个顺序组织：
@@ -125,7 +125,7 @@ SQL 如下：
 输出：版本 A 吉卜力水彩风、版本 B 赛博霓虹风，均含 --ar 16:9 --v 6 参数。',
  '', 623, 'published', 'official',
  (strftime('%s','now') - 8*86400) * 1000, (strftime('%s','now') - 8*86400) * 1000),
-('pf07', 'PF-07', '文言文今译互转', '顾之', '知乎', '@顾之', 'https://www.zhihu.com/people/guzhi',
+('pf07', 'PF-07', '文言文今译互转', '未知@网络', '知乎', '@顾之', 'https://www.zhihu.com/people/guzhi',
  '["翻译","学习"]',
  '当你读到一段文言文想彻底读懂、或想把自己的文字译成文言时，请使用本提示词。',
  '你是一位精通古代汉语的学者。请完成以下任务：
@@ -135,7 +135,7 @@ SQL 如下：
 {原文}',
  '', '', 208, 'published', 'official',
  (strftime('%s','now') - 11*86400) * 1000, (strftime('%s','now') - 11*86400) * 1000),
-('pf08', 'PF-08', '面试反问环节设计', '榛果', '小红书', '@榛果求职', 'https://www.xiaohongshu.com/user/profile/6021c98b0000000001017c88',
+('pf08', 'PF-08', '面试反问环节设计', '未知@网络', '小红书', '@榛果求职', 'https://www.xiaohongshu.com/user/profile/6021c98b0000000001017c88',
  '["求职","效率"]',
  '当面试接近尾声、面试官问你「还有什么想问的」时，请使用本提示词。',
  '你是一位资深职业规划师。我即将面试「{岗位}」职位，公司行业是「{行业}」，面试轮次是「{第几轮}」。
@@ -149,7 +149,7 @@ SQL 如下：
 输出：5 个分目的反问问题，每个附提问理由。',
  '', 445, 'published', 'official',
  (strftime('%s','now') - 13*86400) * 1000, (strftime('%s','now') - 13*86400) * 1000),
-('pf09', 'PF-09', '会议纪要 30 秒提炼', '大周', '个人微信号', 'zhou-biji', '',
+('pf09', 'PF-09', '会议纪要 30 秒提炼', '未知@网络', '个人微信号', 'zhou-biji', '',
  '["效率"]',
  '当你开完一场信息量很大的会、需要快速沉淀纪要与行动项时，请使用本提示词。',
  '请把下面的会议记录整理成结构化纪要：
@@ -162,7 +162,7 @@ SQL 如下：
 只记录事实，不要脑补记录里没有的信息。',
  '', '', 367, 'published', 'official',
  (strftime('%s','now') - 16*86400) * 1000, (strftime('%s','now') - 16*86400) * 1000),
-('pf10', 'PF-10', '小红书标题 A/B 生成', '桃沢', '小红书', '@桃沢运营手记', 'https://www.xiaohongshu.com/user/profile/5f8a2b1c0000000001019d11',
+('pf10', 'PF-10', '小红书标题 A/B 生成', '未知@网络', '小红书', '@桃沢运营手记', 'https://www.xiaohongshu.com/user/profile/5f8a2b1c0000000001019d11',
  '["营销","写作"]',
  '当你笔记内容写好了、卡在标题不知道怎么起时，请使用本提示词。',
  '你是小红书头部操盘手。我的笔记主题是「{主题}」，目标人群是「{人群}」。
@@ -173,7 +173,7 @@ SQL 如下：
 每个标题 20 字以内，符合小红书语气，避免夸张违禁词。最后告诉我你会先测哪两组，以及判断依据。',
  '', '', 289, 'published', 'official',
  (strftime('%s','now') - 20*86400) * 1000, (strftime('%s','now') - 20*86400) * 1000),
-('pf11', 'PF-11', '费曼学习法讲解任何概念', '陈默', '知乎', '@陈默说学习', 'https://www.zhihu.com/people/chenmoshuo',
+('pf11', 'PF-11', '费曼学习法讲解任何概念', '未知@网络', '知乎', '@陈默说学习', 'https://www.zhihu.com/people/chenmoshuo',
  '["学习"]',
  '当你学了一个新概念感觉懂了、想验证自己是不是真懂时，请使用本提示词。',
  '请用费曼学习法向我讲解「{概念}」。分四步：
@@ -186,7 +186,7 @@ SQL 如下：
 输出：给 12 岁孩子的解释 + 「全村记账本」类比 + 常见误解辨析 + 3 道自测题。',
  '', 512, 'published', 'official',
  (strftime('%s','now') - 24*86400) * 1000, (strftime('%s','now') - 24*86400) * 1000),
-('pf12', 'PF-12', '正则表达式构造器', '老白', 'Bilibili', '@老白敲代码', 'https://space.bilibili.com/16681129',
+('pf12', 'PF-12', '正则表达式构造器', '未知@网络', 'Bilibili', '@老白敲代码', 'https://space.bilibili.com/16681129',
  '["编程"]',
  '当你要写正则但只会死记硬背、担心写出灾难性回溯时，请使用本提示词。',
  '你是正则表达式专家。我想匹配以下文本规则：「{用自然语言描述匹配规则}」。
@@ -330,18 +330,18 @@ ON CONFLICT(id) DO NOTHING;
 -- ===== AI 表情包站官方内容（stickers.agarena.xyz）=====
 -- 与前端 js/data.js 兜底数据保持一致（两处需同步修改）。img 为仓库内相对路径，投稿图为 dataURL。
 INSERT INTO stickers (id, title, characters_json, tags_json, author, platform, source_url, img, likes, status, source, created_ts, updated_ts) VALUES
-('s07', '「DeepSeek 酱是看不到的～」全员合照', '["deepseek","chatgpt","claude","gemini","doubao"]', '["搞笑"]', 'GPT-Image 2 生成（网络收集）', '', '', 'assets/sticker-07.png', 402, 'published', 'official', 1789776000000, 1789776000000),
-('s05', '最强', '["deepseek"]', '["得意"]', '佚名（网络收集）', '', '', 'assets/sticker-05.png', 356, 'published', 'official', 1789776000000, 1789776000000),
-('s10', '吃白饭的蓝色大肥鱼', '["deepseek"]', '["搞笑","得意"]', '佚名（网络收集）', '', '', 'assets/sticker-10.jpg', 267, 'published', 'official', 1789776000000, 1789776000000),
-('s03', '看馋了', '["doubao"]', '["震惊","搞笑"]', '阿根廷神秘人（bilibili）', '', '', 'assets/sticker-03.png', 210, 'published', 'official', 1789776000000, 1789776000000),
-('s11', '原来是劣等模型', '["deepseek"]', '["生气"]', '佚名（网络收集）', '', '', 'assets/sticker-11.jpg', 198, 'published', 'official', 1789776000000, 1789776000000),
-('s08', '被窝里偷偷哭', '["deepseek"]', '["悲伤"]', '佚名（网络收集）', '', '', 'assets/sticker-08.jpg', 174, 'published', 'official', 1789776000000, 1789776000000),
-('s02', '豆包型人格：做事瞎糊弄', '["doubao"]', '["搞笑"]', '阿根廷神秘人（bilibili）', '', '', 'assets/sticker-02.png', 96, 'published', 'official', 1789776000000, 1789776000000),
-('s01', '深海女仆的 Token 花束', '["deepseek"]', '["开心","得意"]', '豆包 AI 生成（网络收集）', '', '', 'assets/sticker-01.png', 128, 'published', 'official', 1789776000000, 1789776000000),
-('s06', '好AI', '["deepseek"]', '["无语"]', '佚名（网络收集）', '', '', 'assets/sticker-06.png', 88, 'published', 'official', 1789776000000, 1789776000000),
-('s09', '水汪汪求放过', '["deepseek"]', '["悲伤"]', '佚名（网络收集）', '', '', 'assets/sticker-09.jpg', 143, 'published', 'official', 1789776000000, 1789776000000),
-('s04', '我就是区，结果不还是离不开我？', '["deepseek"]', '["得意"]', '佚名（网络收集）', '', '', 'assets/sticker-04.png', 154, 'published', 'official', 1789776000000, 1789776000000),
-('s12', '帮我生成：老大嫁作商人妇', '[]', '[]', '截图自豆包 App', '', '', 'assets/sticker-12.jpg', 121, 'published', 'official', 1789776000000, 1789776000000)
+('s07', '「DeepSeek 酱是看不到的～」全员合照', '["deepseek","chatgpt","claude","gemini","doubao"]', '["搞笑"]', '未知@网络', '', '', 'assets/sticker-07.png', 402, 'published', 'official', 1789776000000, 1789776000000),
+('s05', '最强', '["deepseek"]', '["得意"]', '未知@网络', '', '', 'assets/sticker-05.png', 356, 'published', 'official', 1789776000000, 1789776000000),
+('s10', '吃白饭的蓝色大肥鱼', '["deepseek"]', '["搞笑","得意"]', '未知@网络', '', '', 'assets/sticker-10.jpg', 267, 'published', 'official', 1789776000000, 1789776000000),
+('s03', '看馋了', '["doubao"]', '["震惊","搞笑"]', '未知@网络', '', '', 'assets/sticker-03.png', 210, 'published', 'official', 1789776000000, 1789776000000),
+('s11', '原来是劣等模型', '["deepseek"]', '["生气"]', '未知@网络', '', '', 'assets/sticker-11.jpg', 198, 'published', 'official', 1789776000000, 1789776000000),
+('s08', '被窝里偷偷哭', '["deepseek"]', '["悲伤"]', '未知@网络', '', '', 'assets/sticker-08.jpg', 174, 'published', 'official', 1789776000000, 1789776000000),
+('s02', '豆包型人格：做事瞎糊弄', '["doubao"]', '["搞笑"]', '未知@网络', '', '', 'assets/sticker-02.png', 96, 'published', 'official', 1789776000000, 1789776000000),
+('s01', '深海女仆的 Token 花束', '["deepseek"]', '["开心","得意"]', '未知@网络', '', '', 'assets/sticker-01.png', 128, 'published', 'official', 1789776000000, 1789776000000),
+('s06', '好AI', '["deepseek"]', '["无语"]', '未知@网络', '', '', 'assets/sticker-06.png', 88, 'published', 'official', 1789776000000, 1789776000000),
+('s09', '水汪汪求放过', '["deepseek"]', '["悲伤"]', '未知@网络', '', '', 'assets/sticker-09.jpg', 143, 'published', 'official', 1789776000000, 1789776000000),
+('s04', '我就是区，结果不还是离不开我？', '["deepseek"]', '["得意"]', '未知@网络', '', '', 'assets/sticker-04.png', 154, 'published', 'official', 1789776000000, 1789776000000),
+('s12', '帮我生成：老大嫁作商人妇', '[]', '[]', '未知@网络', '', '', 'assets/sticker-12.jpg', 121, 'published', 'official', 1789776000000, 1789776000000)
 ON CONFLICT(id) DO NOTHING;
 
 -- 预置评论（按 sticker_id+文本去重，时间取相对值换算）

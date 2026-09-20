@@ -692,6 +692,16 @@ async function handlePromptSubmit(request, env, ctx) {
   if (!title || !scene || !content)
     return Response.json({ ok: false, msg: "title/scene/content required" }, { status: 400 });
 
+  // 自动去重：正文归一化（去空白、小写）后与现有提示词比对
+  const norm = (t) => t.toString().toLowerCase().replace(/\s+/g, "");
+  const normIn = norm(content);
+  const exist = await env.DB.prepare(`SELECT id, no, title, content FROM prompts WHERE status IN ('pending','published')`).all();
+  for (const row of exist.results || []) {
+    if (norm(row.content || "") === normIn) {
+      return Response.json({ ok: false, msg: "duplicate", existing: { id: row.id, no: row.no, title: row.title } }, { status: 409 });
+    }
+  }
+
   const now = Date.now();
   const id = "u" + now;
   await env.DB.prepare(
@@ -699,7 +709,7 @@ async function handlePromptSubmit(request, env, ctx) {
      VALUES (?,?,?,?,?,?,?,?,?,?,?,0,'pending','user',?,?)`
   )
     .bind(
-      id, title, account || "匿名作者", platform, account, url,
+      id, title, account || "未知@网络", platform, account, url,
       JSON.stringify(["投稿"]), scene, content, example, img, now, now
     )
     .run();
@@ -881,13 +891,28 @@ async function handleStickerSubmit(request, env, ctx) {
   let srcUrl = (body.sourceUrl || "").toString().trim().slice(0, 300);
   if (srcUrl && !/^https?:\/\/.+\..+/i.test(srcUrl)) srcUrl = "";
 
+  // 自动去重：前端算好的感知哈希（16 位 hex，64bit）与现有投稿比对，汉明距离 ≤6 视为重复
+  let phash = (body.hash || "").toString().toLowerCase().slice(0, 16);
+  if (!/^[0-9a-f]{16}$/.test(phash)) phash = "";
+  if (phash) {
+    const exist = await env.DB.prepare(
+      `SELECT id, title, phash FROM stickers WHERE status IN ('pending','published') AND phash IS NOT NULL`
+    ).all();
+    const ham = (a, b) => { let d = 0; for (let i = 0; i < 16; i++) { let x = parseInt(a[i], 16) ^ parseInt(b[i], 16); while (x) { d += x & 1; x >>= 1; } } return d; };
+    for (const row of exist.results || []) {
+      if (row.phash && ham(phash, row.phash) <= 6) {
+        return Response.json({ ok: false, msg: "duplicate", existing: { id: row.id, title: row.title } }, { status: 409 });
+      }
+    }
+  }
+
   const now = Date.now();
   const id = "u" + now;
   await env.DB.prepare(
-    `INSERT INTO stickers (id, title, characters_json, tags_json, author, platform, source_url, img, likes, status, source, created_ts, updated_ts)
-     VALUES (?,?,?,?,?,?,?,?,0,'pending','user',?,?)`
+    `INSERT INTO stickers (id, title, characters_json, tags_json, author, platform, source_url, img, likes, status, source, created_ts, updated_ts, phash)
+     VALUES (?,?,?,?,?,?,?,?,0,'pending','user',?,?,?)`
   )
-    .bind(id, title, JSON.stringify(chars), JSON.stringify(tags), author, platform, srcUrl, img, now, now)
+    .bind(id, title, JSON.stringify(chars), JSON.stringify(tags), author, platform, srcUrl, img, now, now, phash || null)
     .run();
   pfLog(env, ctx, { type: "submit", site: "stickers", prompt_id: id, ip: clientIp(request), visitor_id: body.vid, detail: { title, chars } });
   return Response.json({ ok: true, id });

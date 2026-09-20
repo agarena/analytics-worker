@@ -168,6 +168,7 @@ CREATE TABLE IF NOT EXISTS stickers (
   likes           INTEGER DEFAULT 0,
   status          TEXT DEFAULT 'published', -- pending | published | hidden
   source          TEXT DEFAULT 'official',  -- official | user
+  phash           TEXT,                     -- 感知哈希（16 hex），投稿去重用
   created_ts      INTEGER,
   updated_ts      INTEGER
 );
