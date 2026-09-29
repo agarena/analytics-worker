@@ -913,7 +913,13 @@ async function handleStickerLike(request, env, ctx) {
 }
 
 // 投稿：先审后显。图片为前端压缩 dataURL（≤200KB）；角色/标签为字符串数组
+// ⚠️ 2026-09-21 站点迁移：表情包已迁 WorkBuddy 新站（ai-stickers.app.workbuddy.host），
+//    本投稿接口封口返回 410；下方原逻辑保留未删，删除封口段并重新部署即可恢复旧投稿。
 async function handleStickerSubmit(request, env, ctx) {
+  return Response.json({
+    ok: false,
+    msg: "migrated: stickers site moved to https://ai-stickers.app.workbuddy.host (open submit API is token-based there, contact the site owner)",
+  }, { status: 410 });
   if (!rateLimit(request, ":sub", 3)) return Response.json({ ok: false, msg: "rate limited" }, { status: 429 });
   const body = await request.json().catch(() => ({}));
   if (body.hp) return Response.json({ ok: true });

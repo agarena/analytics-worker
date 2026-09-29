@@ -5,10 +5,10 @@
 
 INSERT INTO tools (slug, name, category, one_liner, sort, links_json, media_json, qa_json, updated_ts) VALUES
 ('model-price-compare', 'token定价对比', 'Data',
- '16 家供应商、114 个模型、640+ 套餐统一折算成 ¥/百万 token，一眼找出最划算的 AI 模型套餐。',
- 1, '[{"kind":"open","url":"https://price.agarena.xyz/"}]',
- '[{"type":"image","url":"https://agarena.xyz/assets/tools/model-price-1.png","caption":"定价行情主表"},{"type":"image","url":"https://agarena.xyz/assets/tools/model-price-2.png","caption":"模型信息表"}]',
- '[{"question":"这表能帮我做什么？","answer":"把订阅套餐和按量付费统一折算成 ¥/百万 token 比价，配合热门筛选、同模型排名、性价比指数，30 秒找到最适合的套餐。"},{"question":"数据多久更新？","answer":"持续跟进供应商调价，顶部显示更新日期，更新日志页记录每次变更；下单前以官方页面为准。"},{"question":"能按我的场景调吗？","answer":"能。页面顶部可即时调整汇率、缓存命中率、输入占比与评分基准，全表实时重算（只影响你的浏览，不改站内数据）；另支持筛选、排序、分面、只读 SQL 查询与 CSV 导出。"}]',
+ '12 家供应商、118 个模型、750+ 价格方案统一折算成 ¥/百万 token，一眼找出最划算的 AI 模型套餐。',
+ 1, '[{"kind":"open","url":"https://price.agarena.xyz/v/首页.md"}]',
+ '[{"type":"image","url":"https://agarena.xyz/assets/tools/model-price-1.png","caption":"定价行情主表"},{"type":"image","url":"https://agarena.xyz/assets/tools/model-price-2.png","caption":"模型规格与测评参考"}]',
+ '[{"question":"这表能帮我做什么？","answer":"把订阅套餐和按量付费统一折算成 ¥/百万 token 比价，配合热门方案筛选、同模型排名、性价比指数，30 秒找到最适合的套餐。"},{"question":"数据多久更新？","answer":"持续跟进供应商调价，顶部显示更新日期，页面顶部显示更新日期；下单前以官方页面为准。"},{"question":"能按我的场景调吗？","answer":"能。页面顶部可即时调整汇率、缓存命中率、输入占比与评分基准，全表实时重算（只影响你的浏览，不改站内数据）；另支持筛选、排序、分面、只读 SQL 查询与 CSV 导出。"}]',
  1789776000000),
 ('prompts', '优质提示词聚合网站', 'Prompt',
  '把好用的 AI 提示词收进一张张卡片：使用场景、正文与示例齐备，看到合适的展开即可复制；支持搜索、标签筛选、点赞，还能投稿你的私藏提示词。',
