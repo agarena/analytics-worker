@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS feedback (
   ip      TEXT,
   name    TEXT,
   message TEXT,
+  source  TEXT,           -- 提交来源：site（主站表单）/ form / agent（沃池反馈通道）/ 各站自定标签
   ts      INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_fb_ts ON feedback(ts);

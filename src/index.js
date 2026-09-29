@@ -88,16 +88,20 @@ async function handleDwell(request, env) {
   return Response.json({ ok: true });
 }
 
-// 留言反馈（不公开，仅后台可见）；带蜜罐字段防机器人
+// 留言反馈（不公开，仅后台可见）；蜜罐字段防机器人 + 每 IP 每分钟 5 次防刷。
+// 两种提交形态共用：主站表单 {message, name}；沃池（watchbj）静态站反馈通道
+// {content, contact, source:'form'|'agent'}（source 还可为各站自定标签，≤30 字）。
 async function handleFeedback(request, env) {
+  if (!rateLimit(request, ":fb", 5)) return Response.json({ ok: false, msg: "rate limited" }, { status: 429 });
   const ip = clientIp(request);
   const body = await request.json().catch(() => ({}));
   if (body.hp) return Response.json({ ok: true }); // 蜜罐：人类不会填
-  const msg = (body.message || "").toString().slice(0, 2000);
-  const name = (body.name || "匿名").toString().slice(0, 60);
+  const msg = (body.message || body.content || "").toString().slice(0, 4000);
+  const name = (body.name || body.contact || "匿名").toString().slice(0, 200);
+  const source = (body.source || "site").toString().slice(0, 30);
   if (!msg.trim()) return Response.json({ ok: false, msg: "empty" }, { status: 400 });
-  await env.DB.prepare(`INSERT INTO feedback (ip, name, message, ts) VALUES (?,?,?,?)`)
-    .bind(ip, name, msg, Date.now())
+  await env.DB.prepare(`INSERT INTO feedback (ip, name, message, source, ts) VALUES (?,?,?,?,?)`)
+    .bind(ip, name, msg, source, Date.now())
     .run();
   return Response.json({ ok: true });
 }
@@ -144,7 +148,7 @@ async function handleAdmin(request, env) {
   const bySrc = await env.DB.prepare(
     `SELECT src, src_v, COUNT(*) c FROM visits WHERE ts > ? AND src IS NOT NULL AND src != '' GROUP BY src, src_v ORDER BY c DESC LIMIT 20`
   ).bind(since).all();
-  const fb = await env.DB.prepare(`SELECT name, message, ts FROM feedback ORDER BY ts DESC LIMIT 50`).all();
+  const fb = await env.DB.prepare(`SELECT name, message, source, ts FROM feedback ORDER BY ts DESC LIMIT 50`).all();
   const btnClicks = await env.DB.prepare(`SELECT COUNT(*) c FROM events WHERE type='btn_click' AND ts > ?`).bind(since).first();
   const events = await env.DB.prepare(`SELECT type, detail, ip, ts FROM events ORDER BY ts DESC LIMIT 30`).all();
 
@@ -223,7 +227,7 @@ function renderAdmin(d, days, key) {
     ? d.feedback
         .map(
           (r) =>
-            `<li><b>${esc(r.name)}</b> · ${new Date(r.ts).toLocaleString()}<br>${esc(r.message)}</li>`
+            `<li><b>${esc(r.name)}</b> · ${esc(r.source || "site")} · ${new Date(r.ts).toLocaleString()}<br>${esc(r.message)}</li>`
         )
         .join("")
     : "<li>暂无留言</li>";
