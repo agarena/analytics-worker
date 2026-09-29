@@ -99,9 +99,10 @@ async function handleFeedback(request, env) {
   const msg = (body.message || body.content || "").toString().slice(0, 4000);
   const name = (body.name || body.contact || "匿名").toString().slice(0, 200);
   const source = (body.source || "site").toString().slice(0, 30);
+  const channel = (body.channel || "").toString().slice(0, 20); // 联系方式渠道（邮箱/微信号/手机号/QQ号/飞书/其他）
   if (!msg.trim()) return Response.json({ ok: false, msg: "empty" }, { status: 400 });
-  await env.DB.prepare(`INSERT INTO feedback (ip, name, message, source, ts) VALUES (?,?,?,?,?)`)
-    .bind(ip, name, msg, source, Date.now())
+  await env.DB.prepare(`INSERT INTO feedback (ip, name, message, source, channel, ts) VALUES (?,?,?,?,?,?)`)
+    .bind(ip, name, msg, source, channel || null, Date.now())
     .run();
   return Response.json({ ok: true });
 }
@@ -148,7 +149,7 @@ async function handleAdmin(request, env) {
   const bySrc = await env.DB.prepare(
     `SELECT src, src_v, COUNT(*) c FROM visits WHERE ts > ? AND src IS NOT NULL AND src != '' GROUP BY src, src_v ORDER BY c DESC LIMIT 20`
   ).bind(since).all();
-  const fb = await env.DB.prepare(`SELECT name, message, source, ts FROM feedback ORDER BY ts DESC LIMIT 50`).all();
+  const fb = await env.DB.prepare(`SELECT name, message, source, channel, ts FROM feedback ORDER BY ts DESC LIMIT 50`).all();
   const btnClicks = await env.DB.prepare(`SELECT COUNT(*) c FROM events WHERE type='btn_click' AND ts > ?`).bind(since).first();
   const events = await env.DB.prepare(`SELECT type, detail, ip, ts FROM events ORDER BY ts DESC LIMIT 30`).all();
 
@@ -227,7 +228,7 @@ function renderAdmin(d, days, key) {
     ? d.feedback
         .map(
           (r) =>
-            `<li><b>${esc(r.name)}</b> · ${esc(r.source || "site")} · ${new Date(r.ts).toLocaleString()}<br>${esc(r.message)}</li>`
+            `<li><b>${esc(r.name)}</b> · ${esc(r.source || "site")}${r.channel ? " · " + esc(r.channel) : ""} · ${new Date(r.ts).toLocaleString()}<br>${esc(r.message)}</li>`
         )
         .join("")
     : "<li>暂无留言</li>";
