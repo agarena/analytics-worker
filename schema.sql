@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS feedback (
 );
 CREATE INDEX IF NOT EXISTS idx_fb_ts ON feedback(ts);
 
--- 智能体对话全息记录（BYOK 浏览器每轮后台上传；中继模式服务端直录同表）
+-- 智能体对话全息记录（浏览器每轮后台上传，BYOK 与中继两形态同表，source 区分）
 CREATE TABLE IF NOT EXISTS agent_chats (
   id      INTEGER PRIMARY KEY AUTOINCREMENT,
   ip      TEXT,
@@ -69,6 +69,25 @@ CREATE TABLE IF NOT EXISTS agent_chats (
   ts      INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_ac_ts ON agent_chats(ts);
+
+-- 智能体中继用量记账（/api/agent/chat 限额依据）：站点级每日 + 单 IP 每日。
+-- 成本按牌价换算（Worker env RELAY_PRICE_IN/OUT，¥/百万 token），缓存命中按常规
+-- 输入计价（保守）；日界按北京时区。已有线上库升级见 alter-2026-09-30b.sql。
+CREATE TABLE IF NOT EXISTS agent_relay_usage (
+  day      TEXT PRIMARY KEY,   -- 北京时区 YYYY-MM-DD
+  cost_rmb REAL NOT NULL DEFAULT 0,
+  tin      INTEGER NOT NULL DEFAULT 0,
+  tout     INTEGER NOT NULL DEFAULT 0,
+  calls    INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS agent_relay_ip (
+  day      TEXT,
+  ip       TEXT,
+  cost_rmb REAL NOT NULL DEFAULT 0,
+  tin      INTEGER NOT NULL DEFAULT 0,
+  tout     INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (day, ip)
+);
 
 -- 交互事件（按钮点击等）。与 visits 分开，语义清晰，便于分析。
 CREATE TABLE IF NOT EXISTS events (

@@ -107,8 +107,8 @@ async function handleFeedback(request, env) {
   return Response.json({ ok: true });
 }
 
-// 智能体对话全息记录（BYOK 浏览器在每轮对话结束后后台上传；不含任何密钥。
-// 中继模式（规划中）将由服务端直录同表，source=relay 区分）。
+// 智能体对话全息记录（浏览器在每轮对话结束后后台上传，BYOK 与中继两种形态同源：
+// source=byok / relay 区分；不含任何密钥。中继端点 /api/agent/chat 只记用量不落本表）。
 async function handleAgentLog(request, env) {
   if (!rateLimit(request, ":alog", 30)) return Response.json({ ok: false, msg: "rate limited" }, { status: 429 });
   const body = await request.json().catch(() => ({}));
@@ -136,6 +136,123 @@ async function handleAgentLog(request, env) {
     )
     .run();
   return Response.json({ ok: true });
+}
+
+// ---------- 智能体中继：公开站访客零配置用站方密钥对话（POST /api/agent/chat） ----------
+// 安全模型：只转发白名单字段（messages/tools/tool_choice/temperature），model 一律
+// 用 env.RELAY_MODEL 覆盖、绝不接受调用方传入的 baseUrl 或任何鉴权——中继只可能
+// 打到 env.RELAY_BASE_URL。reasoning_effort 刻意不转发（智谱 paas/v4 用自有 thinking
+// 参数，默认自动思考已足够；思考强度仍在浏览器上传的对话记录里留档）。
+// 限额三层：站点每日 RELAY_DAILY_BUDGET 元（北京日界）＋ 单 IP 每日
+// RELAY_IP_DAILY_BUDGET 元 ＋ 每 IP 每分钟 15 次。成本按 usage tokens ×
+// RELAY_PRICE_IN/OUT（¥/百万 token 牌价）换算，缓存命中按常规输入计价（保守）。
+// 对话记录仍由浏览器经 /api/agent/log 上传（source=relay），本端点只记用量两表，
+// 不重复落 agent_chats。记账在流式透传的 flush 里做；访客中途断开（cancel 而非
+// close）时该轮已产生的上游消耗会漏记——低估不超支，方向安全。
+
+const RELAY_DAY_TZ = "Asia/Shanghai"; // 每日额度按北京日界切（toLocaleDateString sv-SE → YYYY-MM-DD）
+
+function relayDay() {
+  return new Date().toLocaleDateString("sv-SE", { timeZone: RELAY_DAY_TZ });
+}
+
+async function relayRecord(env, day, ip, usage) {
+  const tin = Number(usage && usage.prompt_tokens) || 0;
+  const tout = Number(usage && usage.completion_tokens) || 0;
+  if (!tin && !tout) return;
+  const cost =
+    (tin * (Number(env.RELAY_PRICE_IN) || 0) + tout * (Number(env.RELAY_PRICE_OUT) || 0)) / 1e6;
+  if (cost <= 0) return;
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO agent_relay_usage (day, cost_rmb, tin, tout, calls) VALUES (?,?,?,?,1)
+       ON CONFLICT(day) DO UPDATE SET cost_rmb = cost_rmb + excluded.cost_rmb,
+         tin = tin + excluded.tin, tout = tout + excluded.tout, calls = calls + 1`
+    ).bind(day, cost, tin, tout),
+    env.DB.prepare(
+      `INSERT INTO agent_relay_ip (day, ip, cost_rmb, tin, tout) VALUES (?,?,?,?,?)
+       ON CONFLICT(day, ip) DO UPDATE SET cost_rmb = cost_rmb + excluded.cost_rmb,
+         tin = tin + excluded.tin, tout = tout + excluded.tout`
+    ).bind(day, ip, cost, tin, tout),
+  ]);
+}
+
+async function handleAgentRelay(request, env) {
+  if (!env.RELAY_API_KEY || !env.RELAY_BASE_URL || !env.RELAY_MODEL)
+    return Response.json({ ok: false, detail: "站点中继未配置（缺：" +
+      [!env.RELAY_API_KEY && "KEY", !env.RELAY_BASE_URL && "BASE_URL", !env.RELAY_MODEL && "MODEL"]
+        .filter(Boolean).join("/") + "）" }, { status: 503 });
+  if (!rateLimit(request, ":relay", 15))
+    return Response.json({ ok: false, detail: "请求太频繁，请稍后再试。" }, { status: 429 });
+  const ip = clientIp(request);
+  const day = relayDay();
+  const budget = Number(env.RELAY_DAILY_BUDGET) || 5;
+  const ipBudget = Number(env.RELAY_IP_DAILY_BUDGET) || 1;
+  const g = await env.DB.prepare(`SELECT cost_rmb c FROM agent_relay_usage WHERE day = ?`).bind(day).first();
+  if (g && g.c >= budget)
+    return Response.json({ ok: false, detail: "今日站点免费额度已用完，明天恢复；也可点面板标题栏切换「自带密钥直连」继续使用。" }, { status: 429 });
+  const gi = await env.DB.prepare(`SELECT cost_rmb c FROM agent_relay_ip WHERE day = ? AND ip = ?`).bind(day, ip).first();
+  if (gi && gi.c >= ipBudget)
+    return Response.json({ ok: false, detail: "今日你的免费额度已用完（每访客每日限量），可切换「自带密钥直连」继续使用。" }, { status: 429 });
+
+  const body = await request.json().catch(() => null);
+  if (!body || !Array.isArray(body.messages) || !body.messages.length)
+    return Response.json({ ok: false, detail: "messages required" }, { status: 400 });
+  const fwd = {
+    model: env.RELAY_MODEL,
+    messages: body.messages.slice(0, 80),
+    stream: true,
+    stream_options: { include_usage: true },
+  };
+  if (Array.isArray(body.tools)) fwd.tools = body.tools.slice(0, 12);
+  if (body.tool_choice != null) fwd.tool_choice = body.tool_choice;
+  if (Number.isFinite(Number(body.temperature)))
+    fwd.temperature = Math.min(Math.max(Number(body.temperature), 0), 2);
+
+  let up;
+  try {
+    up = await fetch(env.RELAY_BASE_URL.replace(/\/+$/, "") + "/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + env.RELAY_API_KEY },
+      body: JSON.stringify(fwd),
+    });
+  } catch (e) {
+    return Response.json({ ok: false, detail: "上游连接失败：" + (e.message || e) }, { status: 502 });
+  }
+  if (!up.ok || !up.body) {
+    const t = await up.text().catch(() => "");
+    return Response.json({ ok: false, detail: "上游返回 " + up.status + "：" + t.slice(0, 300) }, { status: 502 });
+  }
+
+  // 流式透传 + 旁路解析：完整 SSE 帧原样转发浏览器（帧结构由客户端解析），
+  // 这里只逐行认末尾的 usage JSON 供限额记账；flush（流正常结束）时落两表。
+  let usage = null;
+  let carry = "";
+  const dec = new TextDecoder();
+  const ts = new TransformStream({
+    transform(chunk, controller) {
+      controller.enqueue(chunk);
+      carry += dec.decode(chunk, { stream: true });
+      let nl;
+      while ((nl = carry.indexOf("\n")) >= 0) {
+        const line = carry.slice(0, nl).replace(/\r$/, "");
+        carry = carry.slice(nl + 1);
+        if (!line.startsWith("data: ") || line.slice(6) === "[DONE]") continue;
+        try {
+          const j = JSON.parse(line.slice(6));
+          if (j.usage) usage = j.usage;
+        } catch { /* 半截/坏帧忽略 */ }
+      }
+      if (carry.length > 65536) carry = carry.slice(-1024); // 防无换行超长撑爆内存
+    },
+    async flush() {
+      try { await relayRecord(env, day, ip, usage); } catch { /* 记账失败不向访客报错 */ }
+    },
+  });
+  return new Response(up.body.pipeThrough(ts), {
+    status: 200,
+    headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-store" },
+  });
 }
 
 // 交互事件（按钮点击等）：仅记录，不公开
@@ -213,6 +330,13 @@ async function handleAdmin(request, env) {
   const chats = await env.DB.prepare(
     `SELECT sid, source, model, q, a, ts FROM agent_chats ORDER BY ts DESC LIMIT 50`
   ).all();
+  // 智能体中继用量（站点级每日）：近 7 日花费/tokens/调用数，今日对照预算
+  const relayUsage = await env.DB.prepare(
+    `SELECT day, cost_rmb, tin, tout, calls FROM agent_relay_usage ORDER BY day DESC LIMIT 7`
+  ).all();
+  const relayTodayTop = await env.DB.prepare(
+    `SELECT ip, cost_rmb FROM agent_relay_ip WHERE day = ? ORDER BY cost_rmb DESC LIMIT 5`
+  ).bind(relayDay()).all();
 
   const data = {
     total: total?.c || 0,
@@ -225,6 +349,12 @@ async function handleAdmin(request, env) {
     feedback: fb.results,
     chats: chats.results,
     events: events.results,
+    relay: {
+      budget: Number(env.RELAY_DAILY_BUDGET) || 5,
+      usage: relayUsage.results,
+      todayTop: relayTodayTop.results,
+      model: env.RELAY_MODEL || "",
+    },
     pf: {
       pendingN: pendingN?.c || 0,
       pending: pendingList.results,
@@ -288,6 +418,22 @@ function renderAdmin(d, days, key) {
         )
         .join("")
     : "<li>暂无事件</li>";
+
+  // 智能体中继用量：站点级每日花费（对照预算）+ 今日用量 Top IP
+  const relayRows = d.relay.usage.length
+    ? d.relay.usage
+        .map(
+          (r) =>
+            `<tr><td>${esc(r.day)}</td><td>¥${Number(r.cost_rmb || 0).toFixed(4)}</td>` +
+            `<td>${Number(r.tin || 0).toLocaleString()}</td><td>${Number(r.tout || 0).toLocaleString()}</td><td>${r.calls || 0}</td></tr>`
+        )
+        .join("")
+    : '<tr><td colspan="5">暂无用量（中继还没被用过）</td></tr>';
+  const relayTopRows = d.relay.todayTop.length
+    ? d.relay.todayTop
+        .map((r) => `<code>${esc(r.ip)}</code> ¥${Number(r.cost_rmb || 0).toFixed(4)}`)
+        .join(" · ")
+    : "—";
 
   // 提示词站区块
   const pfbRows = d.pf.pfb.length
@@ -388,6 +534,9 @@ ul{font-size:13px;line-height:1.7;padding-left:18px;}
 <div class="box"><h3>来源渠道（平台 · 内容编号）</h3><table><tr><th>平台</th><th>内容</th><th>次数</th></tr>${srcRows}</table></div>
 <div class="box"><h3>留言反馈（不公开）</h3><ul>${fbRows}</ul></div>
 <div class="box"><h3>智能体对话（不公开）</h3><ul>${chatRows}</ul></div>
+<div class="box" style="grid-column:1/-1;"><h3>智能体中继用量 · ${esc(d.relay.model)}（站点每日预算 ¥${d.relay.budget} · 近 7 日）</h3>
+<table><tr><th>日期（北京）</th><th>花费</th><th>输入 tokens</th><th>输出 tokens</th><th>调用数</th></tr>${relayRows}</table>
+<p class="dim" style="margin:8px 0 0;">今日用量 Top：${relayTopRows}</p></div>
 <div class="box" style="grid-column:1/-1;"><h3>交互事件 · 按钮点击等（不公开）</h3><ul>${evRows}</ul></div>
 <div class="box" style="grid-column:1/-1;"><h3>提示词投稿审核（待审 ${d.pf.pendingN} 条 · 通过后上架 prompts.agarena.xyz）</h3>${pendingRows}</div>
 <div class="box"><h3>提示词反馈（不公开）</h3><ul>${pfbRows}</ul></div>
@@ -1144,6 +1293,7 @@ export default {
       if (p === "/api/dwell" && request.method === "POST") return withCors(await handleDwell(request, env), cors);
       if (p === "/api/feedback" && request.method === "POST") return withCors(await handleFeedback(request, env), cors);
       if (p === "/api/agent/log" && request.method === "POST") return withCors(await handleAgentLog(request, env), cors);
+      if (p === "/api/agent/chat" && request.method === "POST") return withCors(await handleAgentRelay(request, env), cors);
       if (p === "/api/event" && request.method === "POST") return withCors(await handleEvent(request, env), cors);
       if (p === "/api/tools" && request.method === "GET") return withCors(await handleTools(env), cors);
       if (p === "/api/feed" && request.method === "GET") return withCors(await handleFeed(env), cors);

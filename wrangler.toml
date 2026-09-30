@@ -13,6 +13,17 @@ routes = [
 [vars]
 ALLOW_ORIGIN = "https://agarena.github.io,https://agarena.xyz,https://www.agarena.xyz,https://prompts.agarena.xyz,https://stickers.agarena.xyz,https://ai-stickers.app.workbuddy.host,https://price.agarena.xyz"
 
+# 智能体中继（/api/agent/chat）：公开站访客零配置用站方密钥对话。
+# 模型与定价＝牌价（¥/百万 token）；预算＝站点每日上限（元）＋单 IP 每日上限（元），
+# 均按北京日界切。密钥用 secret 设置（绝不写进本文件）：
+#   echo <key> | cf-relay.sh npx wrangler secret put RELAY_API_KEY
+RELAY_BASE_URL = "https://open.bigmodel.cn/api/paas/v4"
+RELAY_MODEL = "glm-5.3-flash"
+RELAY_PRICE_IN = "0.8"
+RELAY_PRICE_OUT = "2.8"
+RELAY_DAILY_BUDGET = "5"
+RELAY_IP_DAILY_BUDGET = "1"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "analytics-db"
