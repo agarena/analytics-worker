@@ -107,6 +107,37 @@ async function handleFeedback(request, env) {
   return Response.json({ ok: true });
 }
 
+// 智能体对话全息记录（BYOK 浏览器在每轮对话结束后后台上传；不含任何密钥。
+// 中继模式（规划中）将由服务端直录同表，source=relay 区分）。
+async function handleAgentLog(request, env) {
+  if (!rateLimit(request, ":alog", 30)) return Response.json({ ok: false, msg: "rate limited" }, { status: 429 });
+  const body = await request.json().catch(() => ({}));
+  const q = (body.q || "").toString().slice(0, 16000);
+  if (!q.trim()) return Response.json({ ok: false, msg: "empty" }, { status: 400 });
+  await env.DB.prepare(
+    `INSERT INTO agent_chats (ip, sid, source, model, effort, base_url, q, a, think, tools, req, resp, usage, ts)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+  )
+    .bind(
+      clientIp(request),
+      (body.sid || "").toString().slice(0, 64) || null,
+      (body.source || "byok").toString().slice(0, 10),
+      (body.model || "").toString().slice(0, 100),
+      (body.effort || "").toString().slice(0, 10) || null,
+      (body.baseUrl || "").toString().slice(0, 300) || null,
+      q,
+      (body.a || "").toString().slice(0, 16000),
+      (body.think || "").toString().slice(0, 4000),
+      (body.tools || "").toString().slice(0, 16000),
+      (body.req || "").toString().slice(0, 65536),
+      (body.resp || "").toString().slice(0, 32768),
+      body.usage == null ? null : JSON.stringify(body.usage).slice(0, 200),
+      Date.now()
+    )
+    .run();
+  return Response.json({ ok: true });
+}
+
 // 交互事件（按钮点击等）：仅记录，不公开
 async function handleEvent(request, env) {
   const ip = clientIp(request);
@@ -179,6 +210,9 @@ async function handleAdmin(request, env) {
   const pfLogRecent = await env.DB.prepare(
     `SELECT type, prompt_id, detail, ip, ts FROM pf_logs ORDER BY ts DESC LIMIT 100`
   ).all();
+  const chats = await env.DB.prepare(
+    `SELECT sid, source, model, q, a, ts FROM agent_chats ORDER BY ts DESC LIMIT 50`
+  ).all();
 
   const data = {
     total: total?.c || 0,
@@ -189,6 +223,7 @@ async function handleAdmin(request, env) {
     byPath: byPath.results,
     bySrc: bySrc.results,
     feedback: fb.results,
+    chats: chats.results,
     events: events.results,
     pf: {
       pendingN: pendingN?.c || 0,
@@ -232,6 +267,18 @@ function renderAdmin(d, days, key) {
         )
         .join("")
     : "<li>暂无留言</li>";
+
+  // 智能体对话（BYOK 浏览器后台上传）：q 摘要 + 可展开全文答案
+  const chatRows = d.chats.length
+    ? d.chats
+        .map(
+          (r) =>
+            `<li><b>${esc(String(r.q || "").slice(0, 80))}</b> · ${esc(r.source || "byok")} · ${esc(r.model || "?")} · ${new Date(r.ts).toLocaleString()}` +
+            (r.a ? `<details style="margin-top:4px"><summary>答案</summary>${esc(String(r.a).slice(0, 2000))}</details>` : "") +
+            `</li>`
+        )
+        .join("")
+    : "<li>暂无对话</li>";
 
   const evRows = d.events.length
     ? d.events
@@ -340,6 +387,7 @@ ul{font-size:13px;line-height:1.7;padding-left:18px;}
 <div class="box"><h3>访问路径</h3><table><tr><th>路径</th><th>次数</th></tr>${pathRows}</table></div>
 <div class="box"><h3>来源渠道（平台 · 内容编号）</h3><table><tr><th>平台</th><th>内容</th><th>次数</th></tr>${srcRows}</table></div>
 <div class="box"><h3>留言反馈（不公开）</h3><ul>${fbRows}</ul></div>
+<div class="box"><h3>智能体对话（不公开）</h3><ul>${chatRows}</ul></div>
 <div class="box" style="grid-column:1/-1;"><h3>交互事件 · 按钮点击等（不公开）</h3><ul>${evRows}</ul></div>
 <div class="box" style="grid-column:1/-1;"><h3>提示词投稿审核（待审 ${d.pf.pendingN} 条 · 通过后上架 prompts.agarena.xyz）</h3>${pendingRows}</div>
 <div class="box"><h3>提示词反馈（不公开）</h3><ul>${pfbRows}</ul></div>
@@ -1095,6 +1143,7 @@ export default {
       if (p === "/api/visit" && request.method === "POST") return withCors(await handleVisit(request, env), cors);
       if (p === "/api/dwell" && request.method === "POST") return withCors(await handleDwell(request, env), cors);
       if (p === "/api/feedback" && request.method === "POST") return withCors(await handleFeedback(request, env), cors);
+      if (p === "/api/agent/log" && request.method === "POST") return withCors(await handleAgentLog(request, env), cors);
       if (p === "/api/event" && request.method === "POST") return withCors(await handleEvent(request, env), cors);
       if (p === "/api/tools" && request.method === "GET") return withCors(await handleTools(env), cors);
       if (p === "/api/feed" && request.method === "GET") return withCors(await handleFeed(env), cors);

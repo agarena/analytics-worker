@@ -50,6 +50,26 @@ CREATE TABLE IF NOT EXISTS feedback (
 );
 CREATE INDEX IF NOT EXISTS idx_fb_ts ON feedback(ts);
 
+-- 智能体对话全息记录（BYOK 浏览器每轮后台上传；中继模式服务端直录同表）
+CREATE TABLE IF NOT EXISTS agent_chats (
+  id      INTEGER PRIMARY KEY AUTOINCREMENT,
+  ip      TEXT,
+  sid     TEXT,            -- 会话 id（浏览器生成，同会话多问同 sid）
+  source  TEXT,            -- byok / relay
+  model   TEXT,            -- 模型 id
+  effort  TEXT,            -- 思考强度实发值（上游拒收降级后为 NULL）
+  base_url TEXT,           -- 访客所用的 API 地址（不含密钥）
+  q       TEXT,            -- 用户问题
+  a       TEXT,            -- 最终答案
+  think   TEXT,            -- 各轮思考（截断留存）
+  tools   TEXT,            -- JSON [{name,args,ok,summary,result}]（截断留存）
+  req     TEXT,            -- 末轮完整请求 messages JSON（含系统栈与工具往来，截断）
+  resp    TEXT,            -- 末轮完整响应 JSON（content/tool_calls/usage，截断）
+  usage   TEXT,            -- JSON {input,output,cached?}
+  ts      INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_ac_ts ON agent_chats(ts);
+
 -- 交互事件（按钮点击等）。与 visits 分开，语义清晰，便于分析。
 CREATE TABLE IF NOT EXISTS events (
   id      INTEGER PRIMARY KEY AUTOINCREMENT,
